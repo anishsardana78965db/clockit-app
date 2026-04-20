@@ -859,32 +859,6 @@
   <div class="divider"></div>
 
   <div class="admin-section">
-    <div class="section-title">GPS Geofence</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6;">
-      Set the store's coordinates and allowed radius. Employees must be within this range to check in.
-    </div>
-    <div class="input-group">
-      <label class="input-label">Latitude</label>
-      <input class="text-input" id="cfg-store-lat" type="number" step="any" placeholder="25.908917"/>
-    </div>
-    <div class="input-group">
-      <label class="input-label">Longitude</label>
-      <input class="text-input" id="cfg-store-lng" type="number" step="any" placeholder="93.721740"/>
-    </div>
-    <div class="input-group">
-      <label class="input-label">Allowed radius (metres, 10–500)</label>
-      <input class="text-input" id="cfg-store-radius" type="number" min="10" max="500" placeholder="50"/>
-    </div>
-    <div style="display:flex;gap:10px;margin-bottom:8px;">
-      <button class="cta-btn ghost" style="flex:1;margin-bottom:0;" onclick="window.useCurrentLocationForStore()">📍 Use current location</button>
-      <button class="cta-btn primary" style="flex:1;margin-bottom:0;" onclick="window.saveStoreSettings()">Save Location</button>
-    </div>
-    <div id="store-settings-status" style="font-size:12px;color:var(--muted);min-height:16px;margin-top:6px;"></div>
-  </div>
-
-  <div class="divider"></div>
-
-  <div class="admin-section">
     <div class="section-title">Holidays</div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6;">
       Declared holidays count as paid days for all employees. They will not appear as absent in salary calculations.
@@ -957,6 +931,59 @@
   </div>
 
   <div class="divider"></div>
+
+  <div class="divider"></div>
+
+  <!-- GPS Geofence — locked by default, collapsible to edit -->
+  <div class="admin-section" id="geofence-section">
+    <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="window.toggleGeofenceEdit()">
+      <div>
+        <div class="section-title" style="margin-bottom:2px;">📍 GPS Geofence</div>
+        <div style="font-size:12px;color:var(--muted);">Location is set. Tap to edit if needed.</div>
+      </div>
+      <div id="geofence-toggle-icon" style="font-size:18px;color:var(--muted);transition:transform 0.2s;">▸</div>
+    </div>
+
+    <!-- Locked display row (always visible) -->
+    <div id="geofence-locked-display" style="margin-top:12px;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);display:flex;gap:14px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">Latitude</div>
+        <div id="geofence-display-lat" style="font-size:13px;font-weight:600;color:var(--muted);">—</div>
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">Longitude</div>
+        <div id="geofence-display-lng" style="font-size:13px;font-weight:600;color:var(--muted);">—</div>
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">Radius (m)</div>
+        <div id="geofence-display-radius" style="font-size:13px;font-weight:600;color:var(--muted);">—</div>
+      </div>
+    </div>
+
+    <!-- Collapsible edit panel -->
+    <div id="geofence-edit-panel" style="display:none;margin-top:16px;">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;padding:8px 12px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:8px;">
+        ⚠️ Only change this if the store location has permanently moved.
+      </div>
+      <div class="input-group">
+        <label class="input-label">Latitude</label>
+        <input class="text-input" id="cfg-store-lat" type="number" step="any" placeholder="25.908917"/>
+      </div>
+      <div class="input-group">
+        <label class="input-label">Longitude</label>
+        <input class="text-input" id="cfg-store-lng" type="number" step="any" placeholder="93.721740"/>
+      </div>
+      <div class="input-group">
+        <label class="input-label">Allowed radius (metres, 10–500)</label>
+        <input class="text-input" id="cfg-store-radius" type="number" min="10" max="500" placeholder="50"/>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:8px;">
+        <button class="cta-btn ghost" style="flex:1;margin-bottom:0;" onclick="window.useCurrentLocationForStore()">📍 Use current location</button>
+        <button class="cta-btn primary" style="flex:1;margin-bottom:0;" onclick="window.saveStoreSettings()">Save Location</button>
+      </div>
+      <div id="store-settings-status" style="font-size:12px;color:var(--muted);min-height:16px;margin-top:6px;"></div>
+    </div>
+  </div>
 
   <div class="admin-section" id="admin-attendance-section" style="display:none">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
@@ -2028,11 +2055,12 @@ async function loadAdminPanel() {
   const s = settings();
   $('cfg-start-time').value = s.startTime;
   $('cfg-grace').value = s.graceMins;
-  // Geofence settings — refresh from Firestore and populate inputs
+  // Geofence settings — refresh from Firestore and populate inputs + locked display
   await loadStoreSettings();
   $('cfg-store-lat').value = STORE_LAT;
   $('cfg-store-lng').value = STORE_LNG;
   $('cfg-store-radius').value = STORE_RADIUS_M;
+  updateGeofenceLockedDisplay();
   // Holidays — refresh from Firestore and populate list
   await loadHolidays();
   renderHolidaysList();
@@ -2553,6 +2581,24 @@ window.saveSettings = async function() {
   $('cfg-admin-pin').value='';
 };
 
+// ── Store geofence — toggle/locked display helpers ──
+function updateGeofenceLockedDisplay() {
+  const latEl = $('geofence-display-lat');
+  const lngEl = $('geofence-display-lng');
+  const radEl = $('geofence-display-radius');
+  if (latEl) latEl.textContent = STORE_LAT;
+  if (lngEl) lngEl.textContent = STORE_LNG;
+  if (radEl) radEl.textContent = STORE_RADIUS_M + ' m';
+}
+
+window.toggleGeofenceEdit = function() {
+  const panel = $('geofence-edit-panel');
+  const icon  = $('geofence-toggle-icon');
+  const open  = panel.style.display === 'none';
+  panel.style.display = open ? 'block' : 'none';
+  icon.textContent    = open ? '▾' : '▸';
+};
+
 // ── Store geofence settings ──
 window.useCurrentLocationForStore = async function() {
   const statusEl = $('store-settings-status');
@@ -2585,6 +2631,12 @@ window.saveStoreSettings = async function() {
     STORE_LAT = lat;
     STORE_LNG = lng;
     STORE_RADIUS_M = radiusM;
+    updateGeofenceLockedDisplay();
+    // Collapse the edit panel after saving
+    const panel = $('geofence-edit-panel');
+    const icon  = $('geofence-toggle-icon');
+    if (panel) { panel.style.display = 'none'; }
+    if (icon)  { icon.textContent = '▸'; }
     statusEl.textContent = '✓ Store location saved';
     statusEl.style.color = 'var(--success)';
     showToast('Store location saved');
