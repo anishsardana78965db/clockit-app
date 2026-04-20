@@ -1,0 +1,109 @@
+rules_version = '2';
+
+// ClockIt — Titan World / Helios CKT
+// Post-Phase-2 Firestore security rules.
+//
+// Security model (100% serverless, no Cloud Functions):
+// ─────────────────────────────────────────────────────
+// The app has NO auth signup — employees identify by tapping their name and
+// entering a 6-digit PIN. PIN verification happens client-side against the
+// PBKDF2 hash stored on the employee document. That means Firestore cannot
+// actually authenticate "this is Alice"; anyone with the Firebase API key
+// can read/write. These rules exist to:
+//
+//   1. Hide the hashed PIN material from casual reads (no one needs to read
+//      pinHash/pinSalt to check in — verification happens against the
+//      already-loaded document from the employee list query, so we allow
+//      reading those fields, but we can still block *writing* random updates
+//      that would brick accounts).
+//   2. Prevent schema-shape attacks (e.g. someone writing a malformed
+//      attendance record that crashes the reporting view).
+//   3. Keep the `config/` collection write-only through the in-app migration
+//      path.
+//
+// IMPORTANT: these rules are *defense in depth*, not authentication. The real
+// security boundary is "only people inside the store know the admin PIN".
+// If you ever move to Firebase Auth, replace `true` reads/writes with
+// `request.auth != null` and add admin custom claims.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Employees ───
+    // Read: anyone with the API key (needed for the "select your name" screen)
+    // Write: allow create/update that contain the expected fields, and block
+    //        wiping pinHash/pinSalt to prevent account-bricking by a drive-by
+    //        client. Delete is allowed (admin removes employees).
+    match /employees/{empId} {
+      allow read: if true;
+
+      // Require either hashed PIN fields OR legacy plaintext `pin` on any
+      // create. This stops brand-new accounts being created without a PIN.
+      allow create: if (
+        request.resource.data.keys().hasAny(['pinHash', 'pin'])
+      );
+
+      // Updates must NOT null out a hashed PIN without providing a replacement.
+      allow update: if (
+        // Either the update keeps/sets hashed PIN fields…
+        (request.resource.data.pinHash is string && request.resource.data.pinSalt is string)
+        // …or it explicitly clears both (legitimate during PIN reset +
+        // replacement in the same write — the app always writes both salt and
+        // hash together, so this branch is mostly for deleting a user cleanly)
+        || (!('pinHash' in request.resource.data) && !('pin' in request.resource.data))
+      );
+
+      allow delete: if true;
+    }
+
+    // ─── Attendance records ───
+    // Doc ID pattern: {employeeId}_{YYYY-MM-DD}
+    // The app writes `checkIn`, `checkOut`, `employeeId`, `date`, plus
+    // geofence telemetry. We block writes that aren't shaped like an
+    // attendance record.
+    match /attendance/{recordId} {
+      allow read: if true;
+      allow write: if (
+        request.resource.data.employeeId is string &&
+        request.resource.data.date is string &&
+        request.resource.data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+      );
+      allow delete: if true; // admin can remove mis-entered records
+    }
+
+    // ─── Devices (PWA locked kiosks) ───
+    match /devices/{deviceId} {
+      allow read, write: if true;
+    }
+
+    // ─── Settings (store geofence, etc.) ───
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if true; // admin UI writes; client-enforced
+    }
+
+    // ─── Holidays ───
+    match /holidays/{dateId} {
+      allow read: if true;
+      // Doc ID MUST be a valid YYYY-MM-DD date string
+      allow write: if dateId.matches('^\\d{4}-\\d{2}-\\d{2}$');
+      allow delete: if true;
+    }
+
+    // ─── Admin config (hashed admin PIN) ───
+    // Reads are needed so the login screen can verify the admin PIN hash.
+    // Writes gated by client-side migration flow + PIN change UI.
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if (
+        request.resource.data.pinHash is string &&
+        request.resource.data.pinSalt is string
+      );
+    }
+
+    // Catch-all: deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

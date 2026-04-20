@@ -1,0 +1,3154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="theme-color" content="#ffffff"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="apple-mobile-web-app-title" content="ClockIt"/>
+<link rel="manifest" href="manifest.json"/>
+<title>ClockIt</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --surface2: #f0f1f4;
+    --border: #e4e6eb;
+    --border2: #d0d3da;
+    --text: #1a1d23;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent-dim: rgba(37,99,235,0.08);
+    --accent-dark: #1d4ed8;
+    --danger: #dc2626;
+    --danger-dim: rgba(220,38,38,0.08);
+    --success: #16a34a;
+    --success-dim: rgba(22,163,74,0.08);
+    --warning: #d97706;
+    --warning-dim: rgba(217,119,6,0.08);
+    --radius: 14px;
+    --radius-sm: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow-x: hidden;
+  }
+
+  .screen {
+    display: none;
+    width: 100%;
+    max-width: 420px;
+    min-height: 100dvh;
+    padding: 24px 20px 32px;
+    flex-direction: column;
+    animation: fadeUp 0.25s ease both;
+  }
+  .screen.active { display: flex; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Logo / header ── */
+  .logo {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--accent);
+  }
+  .logo span { color: var(--muted); font-weight: 400; }
+
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+  }
+
+  .back-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 7px 14px;
+    border-radius: var(--radius-sm);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    box-shadow: var(--shadow);
+  }
+  .back-btn:hover { color: var(--text); border-color: var(--border2); }
+
+  /* ── Greeting ── */
+  .greeting { margin-bottom: 28px; }
+  .greeting h1 {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+  .greeting p {
+    color: var(--muted);
+    font-size: 14px;
+    margin-top: 5px;
+    font-weight: 400;
+  }
+
+  /* ── Employee list ── */
+  .emp-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex: 1;
+  }
+
+  .emp-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    box-shadow: var(--shadow);
+  }
+  .emp-card:active { transform: scale(0.985); }
+  .emp-card:hover { border-color: var(--accent); box-shadow: var(--shadow-md); }
+
+  .emp-avatar {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    border: 1.5px solid rgba(37,99,235,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 600; color: var(--accent);
+    flex-shrink: 0;
+  }
+
+  .emp-info { flex: 1; min-width: 0; }
+  .emp-name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .emp-role { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+  .emp-status {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 9px;
+    border-radius: 20px;
+    flex-shrink: 0;
+  }
+  .emp-status.in  { background: var(--success-dim); color: var(--success); border: 1px solid rgba(22,163,74,0.2); }
+  .emp-status.out { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+  .emp-status.done { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(37,99,235,0.2); }
+
+  /* ── PIN screen ── */
+  .pin-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .pin-employee {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 32px;
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .pin-dots {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 32px;
+  }
+  .pin-dot {
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    border: 2px solid var(--border2);
+    transition: all 0.15s;
+  }
+  .pin-dot.filled {
+    background: var(--accent);
+    border-color: var(--accent);
+    transform: scale(1.15);
+  }
+  .pin-dot.error {
+    background: var(--danger);
+    border-color: var(--danger);
+    animation: shake 0.35s ease;
+  }
+
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20%      { transform: translateX(-6px); }
+    40%      { transform: translateX(6px); }
+    60%      { transform: translateX(-4px); }
+    80%      { transform: translateX(4px); }
+  }
+
+  .numpad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+
+  .num-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 17px 10px;
+    font-family: 'Inter', sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow);
+  }
+  .num-btn:active { background: var(--surface2); transform: scale(0.94); box-shadow: none; }
+  .num-btn.del { font-size: 15px; color: var(--muted); }
+  .num-btn.empty { opacity: 0; pointer-events: none; }
+
+  .pin-hint { text-align: center; font-size: 12px; color: var(--muted); margin-top: 14px; }
+
+  .pin-submit-btn {
+    width: 100%;
+    margin-top: 18px;
+    padding: 15px;
+    border-radius: var(--radius);
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(37,99,235,0.3);
+    transition: all 0.15s;
+    display: none;
+  }
+  .pin-submit-btn.visible { display: block; }
+  .pin-submit-btn:active { transform: scale(0.97); }
+
+  .loading-overlay {
+    position: fixed; inset: 0;
+    background: rgba(245,246,248,0.85);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 200;
+    font-size: 14px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .loading-overlay.show { display: flex; }
+  .spinner {
+    width: 28px; height: 28px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Dashboard ── */
+  .dash-header { margin-bottom: 20px; }
+  .dash-header h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+  .dash-header .date-str { font-size: 13px; color: var(--muted); margin-top: 3px; }
+
+  .time-card {
+    background: var(--accent);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 12px;
+    box-shadow: 0 4px 14px rgba(37,99,235,0.25);
+  }
+  .time-card-label {
+    font-size: 11px;
+    color: rgba(255,255,255,0.7);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+  .time-card-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: -0.5px;
+  }
+  .time-card-value.muted { color: rgba(255,255,255,0.5); font-size: 26px; }
+  .time-card-sub { font-size: 12px; color: rgba(255,255,255,0.75); margin-top: 5px; }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+  }
+  .stat-label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 5px;
+    font-weight: 500;
+  }
+  .stat-value { font-size: 20px; font-weight: 700; }
+  .stat-value.green { color: var(--success); }
+  .stat-value.yellow { color: var(--warning); }
+  .stat-value.red { color: var(--danger); }
+  .stat-value.accent { color: var(--accent); }
+
+  /* ── CTA buttons ── */
+  .cta-btn {
+    width: 100%;
+    padding: 16px;
+    border-radius: var(--radius);
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+    margin-bottom: 10px;
+    letter-spacing: -0.1px;
+  }
+  .cta-btn:active { transform: scale(0.97); }
+  .cta-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .cta-btn.primary {
+    background: var(--accent);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(37,99,235,0.3);
+  }
+  .cta-btn.primary:hover { background: var(--accent-dark); }
+  .cta-btn.danger {
+    background: var(--danger-dim);
+    color: var(--danger);
+    border: 1px solid rgba(220,38,38,0.2);
+  }
+  .cta-btn.ghost {
+    background: var(--surface);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  .cta-btn.ghost:hover { color: var(--text); border-color: var(--border2); }
+
+  /* ── History ── */
+  .history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin-top: 12px;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .history-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 11px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: var(--shadow);
+  }
+
+  .history-date { font-size: 13px; font-weight: 600; }
+  .history-times { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .history-salary { font-size: 13px; font-weight: 600; color: var(--success); }
+  .history-salary.absent { color: var(--danger); }
+
+  /* ── Admin screen ── */
+  .admin-section { margin-bottom: 24px; }
+  .section-title {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+
+  .input-group { margin-bottom: 10px; }
+  .input-label {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 500;
+    margin-bottom: 5px;
+    display: block;
+  }
+  .text-input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 11px 13px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    box-shadow: var(--shadow);
+  }
+  .text-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+  .text-input::placeholder { color: #9ca3af; }
+
+  .salary-prefix { position: relative; }
+  .salary-prefix .prefix {
+    position: absolute;
+    left: 13px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 14px;
+    pointer-events: none;
+  }
+  .salary-prefix .text-input { padding-left: 28px; }
+
+  .emp-admin-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    margin-bottom: 7px;
+    box-shadow: var(--shadow);
+  }
+  .emp-admin-info { flex: 1; }
+  .emp-admin-name { font-size: 14px; font-weight: 600; }
+  .emp-admin-rate { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .emp-admin-actions { display: flex; gap: 6px; }
+  .emp-delete-btn {
+    background: var(--danger-dim);
+    border: 1px solid rgba(220,38,38,0.2);
+    color: var(--danger);
+    padding: 5px 11px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.15s;
+  }
+  .emp-delete-btn:hover { background: rgba(220,38,38,0.15); }
+
+  /* Manual attendance button */
+  .emp-manual-btn {
+    background: var(--warning-dim);
+    border: 1px solid rgba(217,119,6,0.2);
+    color: var(--warning);
+    padding: 5px 11px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.15s;
+  }
+  .emp-manual-btn:hover { background: rgba(217,119,6,0.15); }
+
+  /* Admin link on login */
+  .admin-link {
+    text-align: center;
+    margin-top: auto;
+    padding-top: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .admin-link:hover { color: var(--accent); }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--text);
+    border-radius: 100px;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #ffffff;
+    z-index: 999;
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    white-space: nowrap;
+    box-shadow: var(--shadow-md);
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  .live-clock { font-size: 13px; color: var(--muted); font-weight: 500; }
+
+  /* Section divider */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 20px 0;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+  /* Modal overlay for manual attendance */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 100;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 22px 20px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: var(--shadow-md);
+    animation: slideUp 0.25s ease;
+  }
+  @keyframes slideUp {
+    from { transform: translateY(30px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+  }
+  .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .modal-sub { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+  .modal-actions .cta-btn { margin-bottom: 0; flex: 1; }
+
+  /* ── Calendar day tooltip ── */
+  .cal-tip {
+    position: absolute;
+    bottom: calc(100% + 7px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1d23;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.5;
+    white-space: nowrap;
+    padding: 6px 9px;
+    border-radius: 7px;
+    pointer-events: none;
+    z-index: 999;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+  .cal-tip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: #1a1d23;
+  }
+  .cal-cell { position: relative; }
+  .cal-cell:hover .cal-tip { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- SCREEN 1: Firebase Config (fallback only) -->
+<div id="screen-config" class="screen">
+  <div class="page-header">
+    <div class="logo">Clock<span>It</span></div>
+    <div class="live-clock" id="top-clock-config"></div>
+  </div>
+  <div class="greeting">
+    <h1>Connect<br/>Database</h1>
+    <p>Paste your Firebase config to get started</p>
+  </div>
+  <div class="input-group">
+    <label class="input-label">API Key</label>
+    <input class="text-input" id="cfg-apiKey" placeholder="AIzaSy..."/>
+  </div>
+  <div class="input-group">
+    <label class="input-label">Auth Domain</label>
+    <input class="text-input" id="cfg-authDomain" placeholder="yourapp.firebaseapp.com"/>
+  </div>
+  <div class="input-group">
+    <label class="input-label">Project ID</label>
+    <input class="text-input" id="cfg-projectId" placeholder="your-project-id"/>
+  </div>
+  <div class="input-group">
+    <label class="input-label">Storage Bucket</label>
+    <input class="text-input" id="cfg-storageBucket" placeholder="yourapp.appspot.com"/>
+  </div>
+  <div class="input-group">
+    <label class="input-label">Messaging Sender ID</label>
+    <input class="text-input" id="cfg-messagingSenderId" placeholder="123456789"/>
+  </div>
+  <div class="input-group">
+    <label class="input-label">App ID</label>
+    <input class="text-input" id="cfg-appId" placeholder="1:123:web:abc..."/>
+  </div>
+  <button class="cta-btn primary" onclick="saveConfig()">Connect &amp; Continue</button>
+</div>
+
+<!-- SCREEN 2: Employee Select -->
+<div id="screen-select" class="screen">
+  <div class="page-header">
+    <div>
+      <div class="logo">Clock<span>It</span></div>
+      <div style="font-size:10px;color:var(--muted);font-weight:500;letter-spacing:0.3px;margin-top:1px;">Titan World / Helios CKT</div>
+    </div>
+    <div class="live-clock" id="top-clock-select"></div>
+  </div>
+  <div class="greeting">
+    <h1>Who's clocking in?</h1>
+    <p id="select-date-str">Loading...</p>
+  </div>
+  <div class="emp-list" id="emp-list"></div>
+  <div class="admin-link" onclick="goAdmin()">⚙ Admin Panel</div>
+</div>
+
+<!-- SCREEN 3: PIN Entry -->
+<div id="screen-pin" class="screen">
+  <div class="page-header">
+    <div class="logo">Clock<span>It</span></div>
+    <button class="back-btn" id="pin-back-btn" onclick="showScreen('screen-select')">← Back</button>
+  </div>
+  <div class="pin-wrap">
+    <div class="pin-employee">
+      <div class="emp-avatar" id="pin-avatar"></div>
+      <div>
+        <div class="emp-name" id="pin-name" style="font-size:15px;font-weight:600;"></div>
+        <div style="color:var(--muted);font-size:12px;margin-top:2px;">Enter your PIN</div>
+      </div>
+    </div>
+    <div class="pin-dots" id="pin-dots">
+      <div class="pin-dot" id="d0"></div>
+      <div class="pin-dot" id="d1"></div>
+      <div class="pin-dot" id="d2"></div>
+      <div class="pin-dot" id="d3"></div>
+      <div class="pin-dot" id="d4"></div>
+      <div class="pin-dot" id="d5"></div>
+    </div>
+    <div class="numpad">
+      <button class="num-btn" onclick="pinPress('1')">1</button>
+      <button class="num-btn" onclick="pinPress('2')">2</button>
+      <button class="num-btn" onclick="pinPress('3')">3</button>
+      <button class="num-btn" onclick="pinPress('4')">4</button>
+      <button class="num-btn" onclick="pinPress('5')">5</button>
+      <button class="num-btn" onclick="pinPress('6')">6</button>
+      <button class="num-btn" onclick="pinPress('7')">7</button>
+      <button class="num-btn" onclick="pinPress('8')">8</button>
+      <button class="num-btn" onclick="pinPress('9')">9</button>
+      <button class="num-btn empty"></button>
+      <button class="num-btn" onclick="pinPress('0')">0</button>
+      <button class="num-btn del" onclick="pinDel()">⌫</button>
+    </div>
+    <button class="pin-submit-btn" id="pin-submit-btn" onclick="submitPin()">Confirm →</button>
+    <div class="pin-hint" id="pin-hint"></div>
+  </div>
+</div>
+
+<!-- SCREEN: Device Registration -->
+<div id="screen-device-reg" class="screen">
+  <div class="page-header">
+    <div>
+      <div class="logo">Clock<span>It</span></div>
+      <div style="font-size:10px;color:var(--muted);font-weight:500;letter-spacing:0.3px;margin-top:1px;">Titan World / Helios CKT</div>
+    </div>
+  </div>
+  <div class="greeting">
+    <h1>Name this device</h1>
+    <p>This helps the admin identify which device belongs to you.</p>
+  </div>
+  <div class="input-group" style="margin-top:8px;">
+    <label class="input-label">Device name</label>
+    <input class="text-input" id="device-name-input" placeholder="e.g. My iPhone, Store iPad" maxlength="40"/>
+  </div>
+  <button class="cta-btn primary" onclick="window.confirmDeviceReg()">Lock this device →</button>
+  <div style="margin-top:16px;padding:12px 14px;background:var(--accent-dim);border:1px solid rgba(37,99,235,0.2);border-radius:12px;font-size:12px;color:var(--muted);line-height:1.6;">
+    🔒 Once locked, this device will always open to your account. Only the admin can reassign it.
+  </div>
+</div>
+
+<!-- SCREEN 4: Employee Dashboard -->
+<div id="screen-dash" class="screen">
+  <div class="page-header">
+    <div class="logo">Clock<span>It</span></div>
+    <div style="font-size:11px;color:var(--muted);" id="dash-device-name"></div>
+  </div>
+  <div class="dash-header">
+    <h2 id="dash-name"></h2>
+    <div class="date-str" id="dash-date"></div>
+  </div>
+
+  <div class="time-card">
+    <div class="time-card-label">Today's check-in</div>
+    <div class="time-card-value muted" id="dash-checkin-val">—</div>
+    <div class="time-card-sub" id="dash-checkin-sub">Not checked in yet</div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Present</div>
+      <div class="stat-value" style="color:var(--success)" id="stat-days">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Absent</div>
+      <div class="stat-value" style="color:var(--danger)" id="stat-absent">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Working days</div>
+      <div class="stat-value accent" id="stat-working">0</div>
+    </div>
+  </div>
+
+  <button class="cta-btn primary" id="btn-checkin" onclick="doCheckIn()">✓ Check In</button>
+  <button class="cta-btn danger" id="btn-checkout" onclick="doCheckOut()" style="display:none">Check Out</button>
+
+  <div class="section-title" style="margin-top:20px">This Month</div>
+  <div id="attendance-calendar"></div>
+
+  <button class="cta-btn ghost" onclick="openEmpPinModal()" style="margin-top:20px;font-size:13px;">🔑 Change My PIN</button>
+</div>
+
+<!-- SCREEN 5: Admin Password -->
+<div id="screen-admin-pin" class="screen">
+  <div class="page-header">
+    <div class="logo">Clock<span>It</span></div>
+    <button class="back-btn" onclick="showScreen('screen-select')">← Back</button>
+  </div>
+  <div class="pin-wrap">
+    <div class="pin-employee">
+      <div class="emp-avatar" style="background:var(--warning-dim);border-color:rgba(217,119,6,0.3);color:var(--warning)">A</div>
+      <div>
+        <div style="font-size:15px;font-weight:600;">Admin</div>
+        <div style="color:var(--muted);font-size:12px;margin-top:2px;">Enter admin password</div>
+      </div>
+    </div>
+    <div style="width:100%;max-width:320px;margin:24px auto 0;">
+      <input class="text-input" id="admin-pw-input" type="password" maxlength="24"
+             placeholder="Password" autocomplete="current-password"
+             style="font-size:16px;letter-spacing:0.05em;text-align:center;"
+             oninput="$('admin-pw-error').textContent=''"
+             onkeydown="if(event.key==='Enter') checkAdminPin()"/>
+      <div id="admin-pw-error" style="color:var(--danger);font-size:12px;text-align:center;margin-top:8px;min-height:18px;"></div>
+      <button class="cta-btn primary" onclick="checkAdminPin()" style="width:100%;margin-top:12px;">Unlock →</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN 5b: One-time PIN Migration (admin-gated) -->
+<div id="screen-migration" class="screen">
+  <div class="page-header">
+    <div class="logo">Clock<span>It</span></div>
+  </div>
+  <div style="max-width:440px;margin:0 auto;padding:24px 20px;">
+    <div style="font-size:28px;margin-bottom:8px;">🔐</div>
+    <div style="font-size:20px;font-weight:600;margin-bottom:6px;">Secure your PINs</div>
+    <div style="color:var(--muted);font-size:14px;line-height:1.5;margin-bottom:20px;">
+      ClockIt is upgrading PIN storage to hashed PBKDF2 (SHA-256, 80k iterations).
+      Plaintext PINs in Firestore will be replaced with salted hashes.
+      This runs once and takes a few seconds.
+    </div>
+    <div style="background:rgba(37,99,235,0.06);border:1px solid rgba(37,99,235,0.2);border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:13px;line-height:1.5;color:var(--ink);">
+      <div style="font-weight:600;margin-bottom:6px;">What happens next</div>
+      <div>• Admin PIN will be hashed &amp; written to <code style="font-size:12px;">config/admin</code></div>
+      <div>• Each employee's PIN will be hashed &amp; their plaintext <code style="font-size:12px;">pin</code> field cleared</div>
+      <div>• Existing PINs do not change — employees keep logging in with the same 6 digits</div>
+    </div>
+    <div id="migration-status" style="font-size:13px;min-height:18px;margin-bottom:14px;color:var(--muted);"></div>
+    <button class="cta-btn primary" id="migration-start-btn" onclick="window.runPinMigration()">Start migration</button>
+    <button class="cta-btn ghost" style="margin-top:10px;font-size:13px;" onclick="showScreen('screen-select')">Cancel</button>
+  </div>
+</div>
+
+<!-- SCREEN 6: Admin Panel -->
+<div id="screen-admin" class="screen">
+  <div class="page-header">
+    <div class="logo">Clock<span>It</span></div>
+    <button class="back-btn" onclick="showScreen('screen-select')">← Exit</button>
+  </div>
+
+  <div class="admin-section">
+    <div class="section-title">Add Employee</div>
+    <div class="input-group">
+      <label class="input-label">Full name</label>
+      <input class="text-input" id="new-emp-name" placeholder="e.g. Priya Sharma"/>
+    </div>
+    <div class="input-group">
+      <label class="input-label">Designation</label>
+      <input class="text-input" id="new-emp-designation" placeholder="e.g. Store Manager, CRO, Service Technician"/>
+    </div>
+    <div class="input-group">
+      <label class="input-label">Monthly salary (₹)</label>
+      <div class="salary-prefix">
+        <span class="prefix">₹</span>
+        <input class="text-input" id="new-emp-rate" type="number" placeholder="15000"/>
+      </div>
+    </div>
+    <div class="input-group">
+      <label class="input-label">6-digit PIN</label>
+      <input class="text-input" id="new-emp-pin" type="password" inputmode="numeric" maxlength="6" placeholder="••••••"/>
+    </div>
+    <button class="cta-btn primary" onclick="addEmployee()">Add Employee</button>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="admin-section">
+    <div class="section-title">Office Hours &amp; Rules</div>
+    <div class="input-group">
+      <label class="input-label">Work start time</label>
+      <input class="text-input" id="cfg-start-time" type="time" value="09:00"/>
+    </div>
+    <div class="input-group">
+      <label class="input-label">Late grace period (minutes)</label>
+      <input class="text-input" id="cfg-grace" type="number" value="15" placeholder="15"/>
+    </div>
+    <div class="input-group">
+      <label class="input-label">Change admin password</label>
+      <input class="text-input" id="cfg-admin-pin" type="password" maxlength="24" placeholder="Leave blank to keep current"/>
+    </div>
+    <button class="cta-btn ghost" onclick="saveSettings()">Save Settings</button>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="admin-section">
+    <div class="section-title">GPS Geofence</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6;">
+      Set the store's coordinates and allowed radius. Employees must be within this range to check in.
+    </div>
+    <div class="input-group">
+      <label class="input-label">Latitude</label>
+      <input class="text-input" id="cfg-store-lat" type="number" step="any" placeholder="25.908917"/>
+    </div>
+    <div class="input-group">
+      <label class="input-label">Longitude</label>
+      <input class="text-input" id="cfg-store-lng" type="number" step="any" placeholder="93.721740"/>
+    </div>
+    <div class="input-group">
+      <label class="input-label">Allowed radius (metres, 10–500)</label>
+      <input class="text-input" id="cfg-store-radius" type="number" min="10" max="500" placeholder="50"/>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:8px;">
+      <button class="cta-btn ghost" style="flex:1;margin-bottom:0;" onclick="window.useCurrentLocationForStore()">📍 Use current location</button>
+      <button class="cta-btn primary" style="flex:1;margin-bottom:0;" onclick="window.saveStoreSettings()">Save Location</button>
+    </div>
+    <div id="store-settings-status" style="font-size:12px;color:var(--muted);min-height:16px;margin-top:6px;"></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="admin-section">
+    <div class="section-title">Holidays</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6;">
+      Declared holidays count as paid days for all employees. They will not appear as absent in salary calculations.
+    </div>
+    <div class="input-group">
+      <label class="input-label">Date</label>
+      <input class="text-input" id="new-holiday-date" type="date"/>
+    </div>
+    <div class="input-group">
+      <label class="input-label">Reason (optional)</label>
+      <input class="text-input" id="new-holiday-reason" placeholder="e.g. Diwali, Republic Day"/>
+    </div>
+    <button class="cta-btn primary" onclick="window.addHoliday()">Add Holiday</button>
+    <div id="holidays-list" style="margin-top:14px;"></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="admin-section">
+    <div class="section-title">Employees</div>
+    <div id="admin-emp-list"></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="admin-section">
+    <div class="section-title">Registered Devices</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6;">
+      Each device is locked to one employee. Unlock to reassign or let the employee pick again.
+    </div>
+    <div id="admin-devices-list"><div style="color:var(--muted);font-size:13px;">Loading...</div></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="admin-section">
+    <div class="section-title">Export / Import</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6;">
+      Export this month's attendance for all employees as Excel. Import an Excel file to add or correct attendance records.
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:12px;">
+      <button class="cta-btn primary" style="flex:1;margin-bottom:0;" onclick="window.exportAttendanceExcel()">⬇ Export Month</button>
+      <button class="cta-btn ghost" style="flex:1;margin-bottom:0;" onclick="document.getElementById('import-excel-input').click()">⬆ Import Excel</button>
+    </div>
+    <input type="file" id="import-excel-input" accept=".xlsx,.xls" style="display:none;" onchange="window.importAttendanceExcel(this)"/>
+    <div id="import-status" style="font-size:12px;color:var(--muted);min-height:16px;"></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="admin-section">
+    <div class="section-title">Backup &amp; Restore</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6;">
+      Download a full backup of <strong>all</strong> employees and attendance records (Excel + JSON). Use the JSON file to restore everything to any device or Firebase project.
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:12px;">
+      <button class="cta-btn primary" style="flex:1;margin-bottom:0;" onclick="window.downloadFullBackup()" id="backup-btn">⬇ Backup Now</button>
+      <button class="cta-btn ghost" style="flex:1;margin-bottom:0;" onclick="document.getElementById('restore-json-input').click()">↩ Restore JSON</button>
+    </div>
+    <input type="file" id="restore-json-input" accept=".json" style="display:none;" onchange="window.restoreFromJson(this)"/>
+    <div id="backup-status" style="font-size:12px;color:var(--muted);min-height:16px;"></div>
+
+    <div style="margin-top:14px;padding:12px 14px;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border);display:flex;align-items:center;gap:10px;">
+      <div style="font-size:20px;line-height:1;">🗓</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:2px;">Weekly Auto-Backup</div>
+        <div id="weekly-backup-info" style="font-size:12px;color:var(--muted);line-height:1.4;">Every Monday when you open admin, both files download automatically.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="admin-section" id="admin-attendance-section" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div class="section-title" style="margin-bottom:0" id="admin-view-title">Attendance</div>
+      <button class="back-btn" onclick="closeAdminView()">✕ Close</button>
+    </div>
+    <div id="admin-attendance-content"></div>
+  </div>
+</div>
+
+<!-- PIN Reset Modal -->
+<div class="modal-overlay" id="pin-reset-modal">
+  <div class="modal-box">
+    <div class="modal-title">Reset PIN</div>
+    <div class="modal-sub" id="pin-reset-sub">Set new PIN for employee</div>
+    <div class="input-group">
+      <label class="input-label">New 6-digit PIN</label>
+      <input class="text-input" id="pin-reset-value" type="password" inputmode="numeric" maxlength="6" placeholder="••••••"/>
+    </div>
+    <div class="modal-actions">
+      <button class="cta-btn ghost" onclick="closePinResetModal()">Cancel</button>
+      <button class="cta-btn primary" onclick="saveResetPin()">Save PIN</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Employee Modal (Admin only) -->
+<div class="modal-overlay" id="edit-emp-modal">
+  <div class="modal-box">
+    <div class="modal-title">Edit Employee</div>
+    <div class="modal-sub" id="edit-emp-sub">Update details</div>
+    <div class="input-group">
+      <label class="input-label">Designation</label>
+      <input class="text-input" id="edit-emp-designation" placeholder="e.g. Store Manager"/>
+    </div>
+    <div class="input-group">
+      <label class="input-label">Monthly salary (₹)</label>
+      <input class="text-input" id="edit-emp-salary" type="number" placeholder="15000"/>
+    </div>
+    <div class="modal-actions">
+      <button class="cta-btn ghost" onclick="closeEditEmpModal()">Cancel</button>
+      <button class="cta-btn primary" onclick="saveEditEmp()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Employee PIN Change Modal -->
+<div class="modal-overlay" id="emp-pin-modal">
+  <div class="modal-box">
+    <div class="modal-title">Change My PIN</div>
+    <div class="modal-sub">Enter your current PIN, then set a new one</div>
+    <div class="input-group">
+      <label class="input-label">Current PIN</label>
+      <input class="text-input" id="emp-pin-current" type="password" inputmode="numeric" maxlength="6" placeholder="••••••"/>
+    </div>
+    <div class="input-group">
+      <label class="input-label">New PIN</label>
+      <input class="text-input" id="emp-pin-new" type="password" inputmode="numeric" maxlength="6" placeholder="••••••"/>
+    </div>
+    <div class="input-group">
+      <label class="input-label">Confirm new PIN</label>
+      <input class="text-input" id="emp-pin-confirm" type="password" inputmode="numeric" maxlength="6" placeholder="••••••"/>
+    </div>
+    <div class="modal-actions">
+      <button class="cta-btn ghost" onclick="closeEmpPinModal()">Cancel</button>
+      <button class="cta-btn primary" onclick="saveEmpPin()">Update PIN</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manual Attendance Modal -->
+<div class="modal-overlay" id="manual-modal">
+  <div class="modal-box">
+    <div class="modal-title">Manual Attendance</div>
+    <div class="modal-sub" id="manual-modal-sub">Mark attendance for employee</div>
+    <div class="input-group">
+      <label class="input-label">Date (YYYY-MM-DD)</label>
+      <input class="text-input" id="manual-date" type="date"/>
+    </div>
+    <div class="input-group">
+      <label class="input-label">Check-in time</label>
+      <input class="text-input" id="manual-checkin" type="time" value="09:00"/>
+    </div>
+    <div class="input-group">
+      <label class="input-label">Check-out time (optional)</label>
+      <input class="text-input" id="manual-checkout" type="time" placeholder="Leave blank if still in"/>
+    </div>
+    <div class="modal-actions">
+      <button class="cta-btn ghost" onclick="closeManualModal()">Cancel</button>
+      <button class="cta-btn primary" onclick="saveManualAttendance()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="loading-overlay" id="loading-overlay">
+  <div class="spinner"></div>
+  <span id="loading-msg">Loading...</span>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+// ── helpers ──
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2,'0');
+const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+const monthStr = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; };
+const fmtTime = ts => { const d=new Date(ts); let h=d.getHours(), m=pad(d.getMinutes()), ampm=h>=12?'PM':'AM'; h=h%12||12; return `${h}:${m} ${ampm}`; };
+const fmtDate = str => {
+  const [y,m,d]=str.split('-');
+  const mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${parseInt(d)} ${mn[parseInt(m)-1]} ${y}`;
+};
+const initials = name => name.trim().split(' ').map(w=>w[0]?.toUpperCase()||'').slice(0,2).join('');
+
+function showToast(msg, dur=2500) {
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), dur);
+}
+
+function showLoading(msg='Loading...') {
+  $('loading-msg').textContent = msg;
+  $('loading-overlay').classList.add('show');
+}
+function hideLoading() {
+  $('loading-overlay').classList.remove('show');
+}
+
+// ── live clock ──
+function updateClocks() {
+  const d=new Date();
+  const s=`${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  ['config','select'].forEach(id=>{ const el=$('top-clock-'+id); if(el) el.textContent=s; });
+}
+updateClocks(); setInterval(updateClocks,10000);
+
+// ── screen management ──
+window.showScreen = function(id) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  $(id).classList.add('active');
+};
+
+const LS_CONFIG     = 'ci_firebase_config';
+const LS_SETTINGS   = 'ci_settings';
+const LS_DEVICE_EMP = 'ci_device_emp'; // legacy — kept for migration
+const LS_DEVICE_ID  = 'ci_device_id';  // permanent device fingerprint UUID
+
+function getOrCreateDeviceId() {
+  let id = localStorage.getItem(LS_DEVICE_ID);
+  if (!id) {
+    id = 'dev_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 9);
+    localStorage.setItem(LS_DEVICE_ID, id);
+  }
+  return id;
+}
+
+let db = null;
+let employees = [];
+let currentEmp = null;
+let todayRecord = null;
+let pinBuffer = '';
+let manualTargetEmp = null;
+let currentDeviceName = '';
+
+function getSettings() {
+  try { return JSON.parse(localStorage.getItem(LS_SETTINGS)) || {}; } catch { return {}; }
+}
+function defaultSettings() { return { startTime:'09:00', graceMins:15, adminPin:'admin1234' }; }
+function settings() { return { ...defaultSettings(), ...getSettings() }; }
+
+// ── Holidays cache ──
+// Map of YYYY-MM-DD → { date, reason, createdAt }
+let holidays = {};
+
+async function loadHolidays() {
+  if (!db) return;
+  try {
+    const snap = await getDocs(collection(db, 'holidays'));
+    holidays = {};
+    snap.forEach(d => { holidays[d.id] = d.data(); });
+  } catch(e) {
+    console.warn('[ClockIt] Could not load holidays:', e);
+  }
+}
+
+function isHoliday(dateStr) { return !!holidays[dateStr]; }
+
+// Given month attendance records and the "now" date, compute:
+//   workingDaysElapsed: total non-Sunday days from start of month through today
+//   daysPresent:  days employee actually checked in
+//   holidaysElapsed: declared holidays in month (excluding Sundays, excluding future, excluding days already counted as present)
+//   paidDays: daysPresent + holidaysElapsed (holidays are paid days)
+//   absentDays: workingDaysElapsed - paidDays
+function computeMonthTotals(monthData, now) {
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const today = now.getDate();
+  const firstOfMonth = new Date(year, month, 1);
+
+  let workingDaysElapsed = 0;
+  for (let d = new Date(firstOfMonth); d <= now; d.setDate(d.getDate()+1)) {
+    if (d.getDay() !== 0) workingDaysElapsed++;
+  }
+
+  const presentDates = new Set(monthData.filter(r => r.checkIn).map(r => r.date));
+  const daysPresent = presentDates.size;
+
+  // Count holidays that fall in this month, are not Sundays, not in the future,
+  // and not already counted as Present (avoid double-counting if employee worked a holiday).
+  let holidaysElapsed = 0;
+  for (let d = 1; d <= today; d++) {
+    const dateStr = `${year}-${pad(month+1)}-${pad(d)}`;
+    const dow = new Date(year, month, d).getDay();
+    if (dow === 0) continue; // Sundays already excluded from workingDays
+    if (!isHoliday(dateStr)) continue;
+    if (presentDates.has(dateStr)) continue; // already counted as present
+    holidaysElapsed++;
+  }
+
+  const paidDays = daysPresent + holidaysElapsed;
+  const absentDays = Math.max(0, workingDaysElapsed - paidDays);
+  return { workingDaysElapsed, daysPresent, holidaysElapsed, paidDays, absentDays };
+}
+
+// ── Phase 2: PIN hashing (PBKDF2 via WebCrypto) ──
+// ~80k iterations targets ~100ms on typical mobile hardware.
+const PBKDF2_ITERS = 80000;
+const PBKDF2_HASH  = 'SHA-256';
+const PBKDF2_BITS  = 256;
+
+function bytesToB64(bytes) {
+  let s = '';
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s);
+}
+function b64ToBytes(b64) {
+  const s = atob(b64);
+  const out = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+  return out;
+}
+function randomSaltB64() {
+  const buf = new Uint8Array(16);
+  crypto.getRandomValues(buf);
+  return bytesToB64(buf);
+}
+
+async function hashPin(pinStr, saltB64, iters = PBKDF2_ITERS) {
+  const salt = b64ToBytes(saltB64);
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(pinStr), { name: 'PBKDF2' }, false, ['deriveBits']
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations: iters, hash: PBKDF2_HASH },
+    keyMaterial, PBKDF2_BITS
+  );
+  return bytesToB64(new Uint8Array(bits));
+}
+
+// Constant-time(-ish) string compare to reduce timing signal.
+function safeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  if (a.length !== b.length) return false;
+  let r = 0;
+  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return r === 0;
+}
+
+// ── Phase 2: Rate limiting ──
+// 3 attempts → 5-min hard lockout. Per-key state in localStorage.
+const LOCKOUT_MAX_ATTEMPTS = 3;
+const LOCKOUT_DURATION_MS  = 5 * 60 * 1000;
+
+function lockoutKey(scope, id) { return `ci_lock_${scope}_${id}`; }
+
+function getLockout(scope, id) {
+  try {
+    const raw = localStorage.getItem(lockoutKey(scope, id));
+    return raw ? JSON.parse(raw) : { attempts: 0, lockedUntil: 0 };
+  } catch { return { attempts: 0, lockedUntil: 0 }; }
+}
+function setLockout(scope, id, state) {
+  localStorage.setItem(lockoutKey(scope, id), JSON.stringify(state));
+}
+function clearLockout(scope, id) {
+  localStorage.removeItem(lockoutKey(scope, id));
+}
+// Returns { locked: boolean, remainingMs: number }
+function checkLockoutState(scope, id) {
+  const s = getLockout(scope, id);
+  const now = Date.now();
+  if (s.lockedUntil && s.lockedUntil > now) {
+    return { locked: true, remainingMs: s.lockedUntil - now, attempts: s.attempts };
+  }
+  // Expired lockout — reset
+  if (s.lockedUntil && s.lockedUntil <= now) {
+    clearLockout(scope, id);
+    return { locked: false, remainingMs: 0, attempts: 0 };
+  }
+  return { locked: false, remainingMs: 0, attempts: s.attempts || 0 };
+}
+function registerFailedAttempt(scope, id) {
+  const s = getLockout(scope, id);
+  s.attempts = (s.attempts || 0) + 1;
+  if (s.attempts >= LOCKOUT_MAX_ATTEMPTS) {
+    s.lockedUntil = Date.now() + LOCKOUT_DURATION_MS;
+  }
+  setLockout(scope, id, s);
+  return s;
+}
+function registerSuccessfulAttempt(scope, id) { clearLockout(scope, id); }
+
+function formatRemaining(ms) {
+  const total = Math.ceil(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+// ── Phase 2: Admin config (config/admin in Firestore) ──
+// Schema: { pinHash, pinSalt, iters, updatedAt }
+let adminConfig = null;
+async function loadAdminConfig() {
+  if (!db) return null;
+  try {
+    const snap = await getDoc(doc(db, 'config', 'admin'));
+    adminConfig = snap.exists() ? snap.data() : null;
+  } catch(e) {
+    console.warn('[ClockIt] Could not load admin config:', e);
+    adminConfig = null;
+  }
+  return adminConfig;
+}
+
+async function verifyAdminPin(pinStr) {
+  if (!adminConfig || !adminConfig.pinHash || !adminConfig.pinSalt) return false;
+  const iters = adminConfig.iters || PBKDF2_ITERS;
+  const h = await hashPin(pinStr, adminConfig.pinSalt, iters);
+  return safeEqual(h, adminConfig.pinHash);
+}
+
+async function writeAdminPin(pinStr) {
+  const salt = randomSaltB64();
+  const h = await hashPin(pinStr, salt);
+  await setDoc(doc(db, 'config', 'admin'), {
+    pinHash: h, pinSalt: salt, iters: PBKDF2_ITERS, updatedAt: Date.now()
+  }, { merge: true });
+  adminConfig = { pinHash: h, pinSalt: salt, iters: PBKDF2_ITERS, updatedAt: Date.now() };
+}
+
+// Verify an employee PIN against whatever the employee doc has.
+// Prefers hashed fields (pinHash + pinSalt). Falls back to legacy plaintext `pin`
+// so pre-migration verify still works (migration screen will clean these up).
+async function verifyEmployeePin(emp, pinStr) {
+  if (emp && emp.pinHash && emp.pinSalt) {
+    const iters = emp.pinIters || PBKDF2_ITERS;
+    const h = await hashPin(pinStr, emp.pinSalt, iters);
+    return safeEqual(h, emp.pinHash);
+  }
+  if (emp && typeof emp.pin === 'string') return emp.pin === pinStr;
+  return false;
+}
+
+// True if any employees or the admin still have plaintext PINs.
+function needsPinMigration(empList) {
+  const adminLegacy = !adminConfig || !adminConfig.pinHash;
+  const empLegacy = (empList || []).some(e => typeof e.pin === 'string' && !e.pinHash);
+  return adminLegacy || empLegacy;
+}
+
+async function initFirebase(cfg) {
+  const app = initializeApp(cfg);
+  db = getFirestore(app);
+  return true;
+}
+
+// ── Config screen ──
+window.saveConfig = async function() {
+  const cfg = {
+    apiKey: $('cfg-apiKey').value.trim(),
+    authDomain: $('cfg-authDomain').value.trim(),
+    projectId: $('cfg-projectId').value.trim(),
+    storageBucket: $('cfg-storageBucket').value.trim(),
+    messagingSenderId: $('cfg-messagingSenderId').value.trim(),
+    appId: $('cfg-appId').value.trim(),
+  };
+  if (!cfg.apiKey || !cfg.projectId) { showToast('Fill in at least API Key and Project ID'); return; }
+  try {
+    await initFirebase(cfg);
+    localStorage.setItem(LS_CONFIG, JSON.stringify(cfg));
+    showToast('Connected!');
+    await loadSelectScreen();
+    showScreen('screen-select');
+  } catch(e) {
+    showToast('Connection failed — check your config');
+    console.error(e);
+  }
+};
+
+// ── Employee list ──
+async function loadSelectScreen() {
+  const today = todayStr();
+  $('select-date-str').textContent = fmtDate(today);
+  employees = await fetchEmployees();
+  const todaySnap = await Promise.all(employees.map(e => getDoc(doc(db,'attendance',`${e.id}_${today}`))));
+  const list = $('emp-list');
+  list.innerHTML = '';
+  if (employees.length === 0) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:32px 0;line-height:1.8;">No employees yet.<br/>Go to the Admin Panel to add employees.</div>';
+    return;
+  }
+  employees.forEach((emp, i) => {
+    const rec = todaySnap[i].data();
+    let statusLabel = '', statusClass = 'out';
+    if (rec?.checkIn && rec?.checkOut) { statusLabel = fmtTime(rec.checkOut); statusClass = 'done'; }
+    else if (rec?.checkIn) { statusLabel = fmtTime(rec.checkIn); statusClass = 'in'; }
+    const card = document.createElement('div');
+    card.className = 'emp-card';
+    card.innerHTML = `
+      <div class="emp-avatar">${initials(emp.name)}</div>
+      <div class="emp-info">
+        <div class="emp-name">${emp.name}</div>
+        <div class="emp-role" style="color:var(--muted);font-size:12px;">${emp.designation||'Employee'}</div>
+      </div>
+      ${statusLabel ? `<div class="emp-status ${statusClass}">${statusLabel}</div>` : ''}
+    `;
+    card.onclick = () => openPin(emp);
+    list.appendChild(card);
+  });
+}
+
+async function fetchEmployees() {
+  const snap = await getDocs(collection(db,'employees'));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+// ── PIN ──
+window.openPin = function(emp, fromLockedDevice) {
+  currentEmp = emp;
+  pinBuffer = '';
+  $('pin-avatar').textContent = initials(emp.name);
+  $('pin-name').textContent = emp.name;
+  $('pin-hint').textContent = '';
+  updatePinDots('pin-dots','d',0);
+  // Hide back button if coming from a locked device — employee can't navigate away
+  $('pin-back-btn').style.display = fromLockedDevice ? 'none' : '';
+  showScreen('screen-pin');
+};
+
+window.pinPress = function(digit) {
+  if (pinBuffer.length >= 6) return;
+  pinBuffer += digit;
+  updatePinDots('pin-dots','d', pinBuffer.length);
+  const btn = $('pin-submit-btn');
+  if (pinBuffer.length === 6) { btn.classList.add('visible'); setTimeout(checkPin, 120); }
+  else btn.classList.remove('visible');
+};
+
+window.pinDel = function() {
+  if (!pinBuffer.length) return;
+  pinBuffer = pinBuffer.slice(0,-1);
+  updatePinDots('pin-dots','d', pinBuffer.length);
+  $('pin-submit-btn').classList.remove('visible');
+};
+
+window.submitPin = function() { if (pinBuffer.length === 6) checkPin(); };
+
+function updatePinDots(wrapperId, prefix, count) {
+  for (let i=0;i<6;i++) {
+    const d=$(prefix+i);
+    d.classList.remove('filled','error');
+    if (i < count) d.classList.add('filled');
+  }
+}
+
+function pinError(prefix) {
+  for (let i=0;i<6;i++) { $(prefix+i).classList.remove('filled'); $(prefix+i).classList.add('error'); }
+  setTimeout(()=>{ for(let i=0;i<6;i++) $(prefix+i).classList.remove('error'); }, 500);
+}
+
+async function checkPin() {
+  const hintEl = $('pin-hint');
+  // Lockout gate (per employee)
+  const lock = checkLockoutState('emp', currentEmp.id);
+  if (lock.locked) {
+    pinError('d'); pinBuffer = '';
+    $('pin-submit-btn').classList.remove('visible');
+    hintEl.textContent = `Locked — try again in ${formatRemaining(lock.remainingMs)}`;
+    return;
+  }
+
+  hintEl.textContent = 'Checking…';
+  const ok = await verifyEmployeePin(currentEmp, pinBuffer);
+  if (!ok) {
+    const st = registerFailedAttempt('emp', currentEmp.id);
+    pinError('d'); pinBuffer = '';
+    $('pin-submit-btn').classList.remove('visible');
+    if (st.lockedUntil && st.lockedUntil > Date.now()) {
+      hintEl.textContent = `Locked — try again in ${formatRemaining(st.lockedUntil - Date.now())}`;
+    } else {
+      const left = LOCKOUT_MAX_ATTEMPTS - st.attempts;
+      hintEl.textContent = `Incorrect PIN — ${left} ${left===1?'try':'tries'} left`;
+      setTimeout(()=>{ if (hintEl.textContent.startsWith('Incorrect PIN')) hintEl.textContent=''; }, 2500);
+    }
+    return;
+  }
+  registerSuccessfulAttempt('emp', currentEmp.id);
+  pinBuffer = '';
+  $('pin-submit-btn').classList.remove('visible');
+  $('pin-hint').textContent = 'Loading...';
+
+  // Check if this device is already registered in Firestore
+  const deviceId = getOrCreateDeviceId();
+  const deviceDoc = await getDoc(doc(db, 'devices', deviceId));
+  const deviceData = deviceDoc.exists() ? deviceDoc.data() : null;
+
+  $('pin-hint').textContent = '';
+
+  if (deviceData && deviceData.empId && !deviceData.unlocked) {
+    // Already locked — go straight to dashboard
+    currentDeviceName = deviceData.deviceName || '';
+    $('dash-device-name').textContent = currentDeviceName;
+    await setDoc(doc(db, 'devices', deviceId), { lastSeen: Date.now() }, { merge: true });
+    await loadDashboard(currentEmp);
+    showScreen('screen-dash');
+  } else {
+    // Not yet registered — show device naming screen
+    currentDeviceName = '';
+    $('device-name-input').value = '';
+    showScreen('screen-device-reg');
+  }
+}
+
+// ── Confirm device registration ──
+window.confirmDeviceReg = async function() {
+  const name = $('device-name-input').value.trim();
+  if (!name) { showToast('Please enter a device name'); return; }
+  const deviceId = getOrCreateDeviceId();
+  await setDoc(doc(db, 'devices', deviceId), {
+    deviceId,
+    deviceName: name,
+    empId: currentEmp.id,
+    empName: currentEmp.name,
+    lockedAt: Date.now(),
+    lastSeen: Date.now(),
+    unlocked: false
+  });
+  currentDeviceName = name;
+  $('dash-device-name').textContent = name;
+  showToast(`Device locked to ${currentEmp.name}`);
+  await loadDashboard(currentEmp);
+  showScreen('screen-dash');
+};
+
+// ── Dashboard ──
+async function loadDashboard(emp) {
+  const today = todayStr();
+  const month = monthStr();
+  $('dash-name').textContent = emp.name;
+  $('dash-date').textContent = fmtDate(today);
+  todayRecord = (await getDoc(doc(db,'attendance',`${emp.id}_${today}`))).data() || null;
+  renderCheckInOut();
+  const monthData = await getMonthRecords(emp.id, month);
+  const now = new Date();
+  // Refresh holidays in case admin added any since last load
+  await loadHolidays();
+  const { workingDaysElapsed, daysPresent, holidaysElapsed, absentDays } = computeMonthTotals(monthData, now);
+  // Show Present stat as "days worked + holidays" so the math adds up on screen
+  $('stat-days').textContent = holidaysElapsed > 0 ? `${daysPresent}+${holidaysElapsed}` : daysPresent;
+  $('stat-absent').textContent = absentDays;
+  $('stat-working').textContent = workingDaysElapsed;
+  renderCalendar(monthData, now);
+}
+
+function renderCheckInOut() {
+  const rec = todayRecord;
+  const btnIn = $('btn-checkin');
+  const btnOut = $('btn-checkout');
+  const valEl = $('dash-checkin-val');
+  const subEl = $('dash-checkin-sub');
+  if (!rec || !rec.checkIn) {
+    valEl.textContent = '—'; valEl.className = 'time-card-value muted';
+    subEl.textContent = 'Not checked in yet'; subEl.style.color = '';
+    btnIn.style.display='block'; btnOut.style.display='none'; btnIn.disabled=false;
+    return;
+  }
+  valEl.textContent = fmtTime(rec.checkIn);
+  valEl.className = 'time-card-value';
+  const s = settings();
+  const [sh,sm] = s.startTime.split(':').map(Number);
+  const ci = new Date(rec.checkIn);
+  const ciMins = ci.getHours()*60+ci.getMinutes();
+  const late = ciMins > sh*60+sm+s.graceMins;
+  subEl.textContent = late ? `Late by ${ciMins-sh*60-sm} min` : 'On time ✓';
+  subEl.style.color = late ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.9)';
+  if (rec.checkOut) {
+    btnIn.style.display='none'; btnOut.style.display='none';
+    const dur = Math.round((rec.checkOut - rec.checkIn)/60000);
+    const h=Math.floor(dur/60), m=dur%60;
+    subEl.textContent += ` · ${h}h ${m}m worked · out at ${fmtTime(rec.checkOut)}`;
+  } else {
+    btnIn.style.display='none'; btnOut.style.display='block';
+  }
+}
+
+function renderCalendar(monthData, now) {
+  const cal = $('attendance-calendar');
+  cal.innerHTML = '';
+  renderCalendarInto(cal, monthData, now);
+}
+
+// adminMode = true → show work-hours colour coding; false → plain green/red for employee view
+function renderCalendarInto(cal, monthData, now, adminMode) {
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const today = now.getDate();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const firstDay = new Date(year, month, 1).getDay();
+
+  const lookup = {};
+  monthData.forEach(r => { lookup[r.date] = r; });
+
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(7,1fr);gap:4px;overflow:visible;';
+
+  dayNames.forEach(d => {
+    const h = document.createElement('div');
+    h.textContent = d;
+    h.style.cssText = 'text-align:center;font-size:10px;font-weight:600;color:var(--muted);padding:4px 0;';
+    grid.appendChild(h);
+  });
+
+  for (let i = 0; i < firstDay; i++) grid.appendChild(document.createElement('div'));
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const cell = document.createElement('div');
+    const dateStr = `${year}-${pad(month+1)}-${pad(d)}`;
+    const dow = new Date(year, month, d).getDay();
+    const isSunday = dow === 0;
+    const isFuture = d > today;
+    const rec = lookup[dateStr];
+    const isPresent = rec && rec.checkIn;
+    const isHolidayCell = isHoliday(dateStr);
+    const isAbsent = !isSunday && !isFuture && d < today && !isPresent && !isHolidayCell;
+    const isToday = d === today;
+
+    let bg, color, border, dotColor, title = '';
+
+    if (isSunday) {
+      bg = 'transparent'; color = 'var(--border2)'; border = '1px dashed var(--border)'; dotColor = null;
+    } else if (isFuture && !isHolidayCell) {
+      bg = 'var(--surface)'; color = 'var(--border2)'; border = '1px solid var(--border)'; dotColor = null;
+    } else if (isHolidayCell && !isPresent) {
+      // Declared holiday, no check-in — paid day, purple
+      bg = 'rgba(147,51,234,0.08)'; color = '#7c3aed'; border = '1px solid rgba(147,51,234,0.3)'; dotColor = '#7c3aed';
+      const reason = holidays[dateStr]?.reason || 'Holiday';
+      title = `🎉 ${reason}${isFuture ? ' · upcoming' : ' · paid day'}`;
+    } else if (isAbsent) {
+      bg = 'rgba(220,38,38,0.08)'; color = 'var(--danger)'; border = '1px solid rgba(220,38,38,0.2)'; dotColor = 'var(--danger)';
+    } else if (isPresent) {
+      // Calculate hours worked
+      const durMins = (rec.checkIn && rec.checkOut) ? Math.round((rec.checkOut - rec.checkIn) / 60000) : null;
+      const durHrs = durMins !== null ? durMins / 60 : null;
+      const ciHour = new Date(rec.checkIn).getHours() + new Date(rec.checkIn).getMinutes()/60;
+      const coHour = rec.checkOut ? new Date(rec.checkOut).getHours() + new Date(rec.checkOut).getMinutes()/60 : null;
+      const lateStart = ciHour > 10.0; // after 10:00 AM
+      const earlyEnd = coHour !== null && coHour < 18.0; // before 6:00 PM
+
+      if (adminMode) {
+        // No checkout yet — show neutral green (still in)
+        if (!rec.checkOut) {
+          bg = 'rgba(22,163,74,0.12)'; color = 'var(--success)'; border = '1px solid rgba(22,163,74,0.3)'; dotColor = 'var(--success)';
+        } else if (durHrs >= 8 && !lateStart && !earlyEnd) {
+          // Full shift ≥8h, in by 10, out after 18 → green
+          bg = 'rgba(22,163,74,0.15)'; color = '#15803d'; border = '1px solid rgba(22,163,74,0.4)'; dotColor = 'var(--success)';
+        } else if (durHrs < 4) {
+          // Very short shift <4h → red
+          bg = 'rgba(220,38,38,0.12)'; color = 'var(--danger)'; border = '1px solid rgba(220,38,38,0.35)'; dotColor = 'var(--danger)';
+        } else {
+          // Partial — late start, early leave, or 4–8h → yellow
+          bg = 'rgba(217,119,6,0.12)'; color = '#b45309'; border = '1px solid rgba(217,119,6,0.35)'; dotColor = '#d97706';
+        }
+        const dur = durMins !== null ? `${Math.floor(durMins/60)}h ${durMins%60}m` : '';
+        title = `In: ${fmtTime(rec.checkIn)}${rec.checkOut ? ' · Out: '+fmtTime(rec.checkOut)+(dur?' ('+dur+')':'') : ' · Still in'}`;
+        if (rec.checkInDistanceM != null) title += ` · 📍${rec.checkInDistanceM}m`;
+        if (adminMode && rec.checkOut) {
+          if (durHrs < 4) title += ' ⚠ Short shift';
+          else if (lateStart) title += ' ⚠ Late start';
+          else if (earlyEnd) title += ' ⚠ Early leave';
+        }
+        if (rec.checkOutOutsideFence) title += ' ⚠ Off-site checkout';
+        if (isHolidayCell) {
+          title += ` · 🎉 ${holidays[dateStr]?.reason || 'Holiday'}`;
+          // Overlay a purple accent on the border for worked holidays
+          border = '1px solid rgba(147,51,234,0.5)';
+        }
+      } else {
+        // Employee view — plain green
+        bg = 'rgba(22,163,74,0.12)'; color = 'var(--success)'; border = '1px solid rgba(22,163,74,0.3)'; dotColor = 'var(--success)';
+        const dur = (rec.checkIn && rec.checkOut) ? (() => { const m=Math.round((rec.checkOut-rec.checkIn)/60000); return `${Math.floor(m/60)}h ${m%60}m`; })() : '';
+        title = `In: ${fmtTime(rec.checkIn)}${rec.checkOut ? ' · Out: '+fmtTime(rec.checkOut)+(dur?' ('+dur+')':'') : ' · Still in'}`;
+        if (isHolidayCell) {
+          title += ` · 🎉 ${holidays[dateStr]?.reason || 'Holiday'}`;
+          border = '1px solid rgba(147,51,234,0.5)';
+        }
+      }
+    } else {
+      // Today not yet checked in
+      bg = 'var(--surface2)'; color = 'var(--muted)'; border = '1px solid var(--border)'; dotColor = null;
+    }
+
+    if (isToday) border = `2px solid ${isPresent ? (adminMode ? dotColor||'var(--success)' : 'var(--success)') : 'var(--accent)'}`;
+
+    cell.className = 'cal-cell';
+    cell.style.cssText = `text-align:center;padding:6px 2px;border-radius:8px;background:${bg};color:${color};border:${border};font-size:12px;font-weight:${isToday?'700':'500'};position:relative;cursor:${isPresent?'default':'default'};`;
+    cell.textContent = d;
+    if (title) {
+      // Build rich tooltip
+      const tip = document.createElement('div');
+      tip.className = 'cal-tip';
+      tip.innerHTML = title.replace(/ · /g, '<br>');
+      cell.appendChild(tip);
+    }
+
+    if (dotColor) {
+      const dot = document.createElement('div');
+      dot.style.cssText = `width:4px;height:4px;border-radius:50%;margin:2px auto 0;background:${dotColor};`;
+      cell.appendChild(dot);
+    }
+
+    grid.appendChild(cell);
+  }
+
+  cal.appendChild(grid);
+
+  // Legend
+  const legend = document.createElement('div');
+  if (adminMode) {
+    legend.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:12px;justify-content:center;';
+    legend.innerHTML = `
+      <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:rgba(22,163,74,0.2);display:inline-block;"></span> Full shift (≥8h)</span>
+      <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:rgba(217,119,6,0.15);display:inline-block;"></span> Partial / late</span>
+      <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:rgba(220,38,38,0.12);display:inline-block;"></span> Short (&lt;4h) / absent</span>
+      <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:rgba(147,51,234,0.12);display:inline-block;"></span> Holiday (paid)</span>
+      <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:var(--surface2);display:inline-block;"></span> Sunday</span>
+    `;
+  } else {
+    legend.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:12px;justify-content:center;';
+    legend.innerHTML = `
+      <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:rgba(22,163,74,0.2);display:inline-block;"></span> Present</span>
+      <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:rgba(220,38,38,0.1);display:inline-block;"></span> Absent</span>
+      <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:rgba(147,51,234,0.12);display:inline-block;"></span> Holiday</span>
+      <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:var(--surface2);display:inline-block;"></span> Sunday</span>
+    `;
+  }
+  cal.appendChild(legend);
+}
+
+async function getMonthRecords(empId, month) {
+  // Fetch only the days of this month for this employee using known doc IDs
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const today = now.getDate();
+  const limit = Math.min(daysInMonth, today);
+
+  const fetches = [];
+  for (let d = 1; d <= limit; d++) {
+    const dateStr = `${month}-${pad(d)}`;
+    fetches.push(getDoc(doc(db,'attendance',`${empId}_${dateStr}`)));
+  }
+  const snaps = await Promise.all(fetches);
+  const records = [];
+  snaps.forEach((s, i) => {
+    const dateStr = `${month}-${pad(i+1)}`;
+    if (s.exists()) records.push({ date: dateStr, ...s.data() });
+  });
+  records.sort((a,b)=>a.date.localeCompare(b.date));
+  return records;
+}
+
+// ── GPS geofence ──
+// These are fallback defaults. Actual values are loaded from /settings/store
+// on boot; admin can edit them via the admin panel.
+const DEFAULT_STORE_LAT  = 25.908917;
+const DEFAULT_STORE_LNG  = 93.721740;
+const DEFAULT_STORE_RADIUS_M = 50;
+let STORE_LAT  = DEFAULT_STORE_LAT;
+let STORE_LNG  = DEFAULT_STORE_LNG;
+let STORE_RADIUS_M = DEFAULT_STORE_RADIUS_M;
+
+async function loadStoreSettings() {
+  if (!db) return;
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'store'));
+    if (snap.exists()) {
+      const d = snap.data();
+      if (typeof d.lat === 'number')    STORE_LAT = d.lat;
+      if (typeof d.lng === 'number')    STORE_LNG = d.lng;
+      if (typeof d.radiusM === 'number') STORE_RADIUS_M = d.radiusM;
+    }
+  } catch(e) {
+    console.warn('[ClockIt] Could not load store settings, using defaults:', e);
+  }
+}
+
+function haversineDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371000; // Earth radius in metres
+  const toRad = x => x * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function getLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) { reject(new Error('GPS not supported on this device')); return; }
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true, timeout: 10000, maximumAge: 0
+    });
+  });
+}
+
+// ── Check In / Out ──
+window.doCheckIn = async function() {
+  const btn = $('btn-checkin');
+  btn.disabled = true;
+  btn.textContent = '📍 Getting location...';
+
+  let lat = null, lng = null, distanceM = null;
+  try {
+    const pos = await getLocation();
+    lat = pos.coords.latitude;
+    lng = pos.coords.longitude;
+    distanceM = Math.round(haversineDistance(lat, lng, STORE_LAT, STORE_LNG));
+
+    if (distanceM > STORE_RADIUS_M) {
+      showToast('You are too far from the store to check in.', 4000);
+      btn.disabled = false;
+      btn.textContent = '✓ Check In';
+      return;
+    }
+  } catch(e) {
+    // GPS denied or failed — block check-in
+    showToast('Location access required to check in. Please allow location and try again.', 4000);
+    btn.disabled = false;
+    btn.textContent = '✓ Check In';
+    return;
+  }
+
+  const today = todayStr();
+  const ref = doc(db,'attendance',`${currentEmp.id}_${today}`);
+  const now = Date.now();
+  const data = { checkIn: now, employeeId: currentEmp.id, date: today };
+  if (lat !== null) { data.checkInLat = lat; data.checkInLng = lng; data.checkInDistanceM = distanceM; }
+  await setDoc(ref, data, { merge: true });
+  todayRecord = { checkIn: now, checkInLat: lat, checkInLng: lng, checkInDistanceM: distanceM };
+  renderCheckInOut();
+  showToast(`Checked in at ${fmtTime(now)}`);
+  await loadDashboard(currentEmp);
+};
+
+window.doCheckOut = async function() {
+  const btn = $('btn-checkout');
+  btn.disabled = true;
+  btn.textContent = '📍 Getting location...';
+
+  // Soft geofence check — never block checkout, just log location + flags.
+  let lat = null, lng = null, distanceM = null, outsideFence = false, gpsUnavailable = false;
+  try {
+    const pos = await getLocation();
+    lat = pos.coords.latitude;
+    lng = pos.coords.longitude;
+    distanceM = Math.round(haversineDistance(lat, lng, STORE_LAT, STORE_LNG));
+    outsideFence = distanceM > STORE_RADIUS_M;
+  } catch(e) {
+    gpsUnavailable = true;
+  }
+
+  const today = todayStr();
+  const ref = doc(db,'attendance',`${currentEmp.id}_${today}`);
+  const now = Date.now();
+  const update = { checkOut: now };
+  if (lat !== null) {
+    update.checkOutLat = lat;
+    update.checkOutLng = lng;
+    update.checkOutDistanceM = distanceM;
+    if (outsideFence) update.checkOutOutsideFence = true;
+  }
+  if (gpsUnavailable) update.checkOutGpsUnavailable = true;
+
+  await setDoc(ref, update, { merge: true });
+  todayRecord = { ...todayRecord, ...update };
+  renderCheckInOut();
+
+  // User-facing toast — warn if off-site but still allow checkout
+  if (outsideFence) {
+    showToast(`Checked out at ${fmtTime(now)} — location logged as off-site (${distanceM}m)`, 4000);
+  } else if (gpsUnavailable) {
+    showToast(`Checked out at ${fmtTime(now)} — location unavailable`, 3000);
+  } else {
+    showToast('Checked out at ' + fmtTime(now));
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Check Out';
+  await loadDashboard(currentEmp);
+};
+
+// ── Phase 2: Migration screen ──
+// The admin PIN that was just verified is passed in so we can hash it too without re-prompting.
+let _migrationAdminPin = null;
+function openMigrationScreen(adminPinJustVerified) {
+  _migrationAdminPin = adminPinJustVerified || null;
+  $('migration-status').textContent = '';
+  $('migration-status').style.color = 'var(--muted)';
+  $('migration-start-btn').disabled = false;
+  $('migration-start-btn').textContent = 'Start migration';
+  showScreen('screen-migration');
+}
+window.runPinMigration = async function() {
+  const statusEl = $('migration-status');
+  const btn = $('migration-start-btn');
+  btn.disabled = true;
+  btn.textContent = 'Migrating…';
+  statusEl.style.color = 'var(--muted)';
+  try {
+    // 1. Admin PIN → config/admin hash if not already migrated
+    if (!adminConfig || !adminConfig.pinHash) {
+      const pinToHash = _migrationAdminPin || settings().adminPin || '000000';
+      statusEl.textContent = 'Hashing admin PIN…';
+      await writeAdminPin(pinToHash);
+    }
+    // 2. Each employee with plaintext pin → hash & null out the plaintext field
+    const emps = await fetchEmployees();
+    const toMigrate = emps.filter(e => typeof e.pin === 'string' && !e.pinHash);
+    let done = 0;
+    for (const emp of toMigrate) {
+      statusEl.textContent = `Hashing employee PINs (${done+1}/${toMigrate.length})…`;
+      const salt = randomSaltB64();
+      const h = await hashPin(emp.pin, salt);
+      await setDoc(doc(db, 'employees', emp.id), {
+        pinHash: h, pinSalt: salt, pinIters: PBKDF2_ITERS, pin: null
+      }, { merge: true });
+      done++;
+    }
+    // 3. Clear legacy localStorage adminPin so future logins go through Firestore hash only
+    try {
+      const s = getSettings();
+      if (s.adminPin) { delete s.adminPin; localStorage.setItem(LS_SETTINGS, JSON.stringify(s)); }
+    } catch {}
+    _migrationAdminPin = null;
+
+    statusEl.style.color = 'var(--success)';
+    statusEl.textContent = `✓ Migration complete — ${done} employee${done===1?'':'s'} + admin PIN secured`;
+    btn.textContent = 'Open admin panel →';
+    btn.disabled = false;
+    btn.onclick = async () => {
+      btn.onclick = null;
+      await loadAdminPanel();
+      showScreen('screen-admin');
+    };
+  } catch(e) {
+    console.error(e);
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = '✗ Migration failed: ' + (e.message || 'unknown error');
+    btn.disabled = false;
+    btn.textContent = 'Retry';
+  }
+};
+
+// ── Admin ──
+window.goAdmin = async function() {
+  const input = $('admin-pw-input');
+  const errEl = $('admin-pw-error');
+  if (input) { input.value = ''; }
+  if (errEl) { errEl.textContent = ''; }
+  // Lazy-load admin config if we haven't yet
+  if (adminConfig === null) await loadAdminConfig();
+  // Pre-check lockout
+  const lock = checkLockoutState('admin', 'admin');
+  if (lock.locked && errEl) {
+    errEl.textContent = `Locked — try again in ${formatRemaining(lock.remainingMs)}`;
+  }
+  showScreen('screen-admin-pin');
+  // Focus input after screen transition
+  setTimeout(() => { if (input) input.focus(); }, 150);
+};
+
+async function checkAdminPin() {
+  const input = $('admin-pw-input');
+  const errEl = $('admin-pw-error');
+  const entered = (input ? input.value : '').trim();
+
+  // Lockout gate
+  const lock = checkLockoutState('admin', 'admin');
+  if (lock.locked) {
+    if (input) input.value = '';
+    if (errEl) errEl.textContent = `Locked — try again in ${formatRemaining(lock.remainingMs)}`;
+    return;
+  }
+
+  if (!entered) {
+    if (errEl) errEl.textContent = 'Please enter your password';
+    return;
+  }
+
+  // Verify: prefer hashed admin config if present, otherwise allow legacy plaintext
+  // so the migration screen can take over on first run.
+  let ok = false;
+  if (adminConfig && adminConfig.pinHash) {
+    if (errEl) errEl.textContent = 'Checking…';
+    ok = await verifyAdminPin(entered);
+  } else {
+    const s = settings();
+    ok = (entered === s.adminPin);
+  }
+
+  if (!ok) {
+    const st = registerFailedAttempt('admin', 'admin');
+    if (input) { input.value = ''; input.focus(); }
+    if (errEl) {
+      if (st.lockedUntil && st.lockedUntil > Date.now()) {
+        errEl.textContent = `Locked — try again in ${formatRemaining(st.lockedUntil - Date.now())}`;
+      } else {
+        const left = LOCKOUT_MAX_ATTEMPTS - st.attempts;
+        errEl.textContent = `Wrong password — ${left} ${left===1?'try':'tries'} left`;
+      }
+    }
+    return;
+  }
+
+  registerSuccessfulAttempt('admin', 'admin');
+  if (input) input.value = '';
+  if (errEl) errEl.textContent = 'Loading…';
+
+  // If migration is needed, route to migration screen (admin just proved they know the password)
+  const emps = await fetchEmployees();
+  if (needsPinMigration(emps)) {
+    if (errEl) errEl.textContent = '';
+    openMigrationScreen(entered);
+    return;
+  }
+
+  await loadAdminPanel();
+  if (errEl) errEl.textContent = '';
+  showScreen('screen-admin');
+}
+
+async function loadAdminPanel() {
+  employees = await fetchEmployees();
+  const s = settings();
+  $('cfg-start-time').value = s.startTime;
+  $('cfg-grace').value = s.graceMins;
+  // Geofence settings — refresh from Firestore and populate inputs
+  await loadStoreSettings();
+  $('cfg-store-lat').value = STORE_LAT;
+  $('cfg-store-lng').value = STORE_LNG;
+  $('cfg-store-radius').value = STORE_RADIUS_M;
+  // Holidays — refresh from Firestore and populate list
+  await loadHolidays();
+  renderHolidaysList();
+  // Show last backup date in the weekly backup info pill
+  const lastRun = parseInt(localStorage.getItem(LS_LAST_BACKUP) || '0');
+  const infoEl = $('weekly-backup-info');
+  if (infoEl && lastRun) {
+    infoEl.textContent = `Last auto-backup: ${new Date(lastRun).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })} · runs every Monday`;
+  }
+  // Trigger weekly auto-backup silently in background
+  maybeRunWeeklyBackup().catch(() => {});
+  await loadDeviceList();
+  const list = $('admin-emp-list');
+  list.innerHTML = '';
+  if (!employees.length) {
+    list.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px 0;">No employees added yet.</div>';
+    return;
+  }
+  employees.forEach(emp => {
+    const card = document.createElement('div');
+    card.className = 'emp-admin-card';
+    card.innerHTML = `
+      <div class="emp-avatar" style="width:36px;height:36px;font-size:13px;">${initials(emp.name)}</div>
+      <div class="emp-admin-info">
+        <div class="emp-admin-name">${emp.name}</div>
+        <div class="emp-admin-rate">${emp.designation||'Employee'} · ₹${((emp.monthlySalary||emp.dailyRate||0)).toLocaleString('en-IN')}/mo</div>
+      </div>
+      <div class="emp-admin-actions" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+        <div style="display:flex;gap:6px;">
+          <button class="emp-manual-btn" onclick="viewEmpAttendance('${emp.id}','${emp.name}')">View</button>
+          <button class="emp-manual-btn" onclick="openManualModal('${emp.id}','${emp.name}')">Manual Entry</button>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="emp-manual-btn" onclick="openEditEmpModal('${emp.id}','${emp.name}','${(emp.designation||'Employee').replace(/'/g,'&#39;')}',${emp.monthlySalary||emp.dailyRate||0})">Edit</button>
+          <button class="emp-manual-btn" onclick="openPinResetModal('${emp.id}','${emp.name}')">Reset PIN</button>
+          <button class="emp-delete-btn" onclick="deleteEmployee('${emp.id}')">Remove</button>
+        </div>
+      </div>
+    `;
+    list.appendChild(card);
+    // inline attendance panel placeholder (hidden by default)
+    const panel = document.createElement('div');
+    panel.id = 'view-panel-' + emp.id;
+    panel.style.display = 'none';
+    list.appendChild(panel);
+  });
+}
+
+window.addEmployee = async function() {
+  const name = $('new-emp-name').value.trim();
+  const designation = $('new-emp-designation').value.trim();
+  const rate = parseInt($('new-emp-rate').value);
+  const pin  = $('new-emp-pin').value.trim();
+  if (!name) { showToast('Enter employee name'); return; }
+  if (!rate||rate<1) { showToast('Enter a valid monthly salary'); return; }
+  if (pin.length!==6||!/^\d{6}$/.test(pin)) { showToast('PIN must be exactly 6 digits'); return; }
+  const id = name.toLowerCase().replace(/\s+/g,'_') + '_' + Date.now();
+  const salt = randomSaltB64();
+  const pinHash = await hashPin(pin, salt);
+  await setDoc(doc(db,'employees',id), {
+    name, designation: designation||'Employee', monthlySalary: rate,
+    pinHash, pinSalt: salt, pinIters: PBKDF2_ITERS,
+    createdAt: Date.now()
+  });
+  $('new-emp-name').value=''; $('new-emp-designation').value=''; $('new-emp-rate').value=''; $('new-emp-pin').value='';
+  showToast(`${name} added`);
+  await loadAdminPanel();
+};
+
+window.deleteEmployee = async function(id) {
+  if (!confirm('Remove this employee? Their attendance records will be kept.')) return;
+  await deleteDoc(doc(db,'employees',id));
+  showToast('Employee removed');
+  await loadAdminPanel();
+};
+
+// ── Admin: Device management ──
+async function loadDeviceList() {
+  const listEl = $('admin-devices-list');
+  const snap = await getDocs(collection(db, 'devices'));
+  const allDevices = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .filter(d => d.empId && !d.unlocked)
+    .sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
+
+  // Keep only the most-recently-seen device per employee
+  const seen = new Set();
+  const devices = allDevices.filter(d => {
+    if (seen.has(d.empId)) return false;
+    seen.add(d.empId);
+    return true;
+  });
+
+  if (!devices.length) {
+    listEl.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0;">No devices registered yet.</div>';
+    return;
+  }
+
+  listEl.innerHTML = '';
+  devices.forEach(dev => {
+    const lastSeen = dev.lastSeen ? new Date(dev.lastSeen).toLocaleString('en-IN', { day:'numeric', month:'short', hour:'numeric', minute:'2-digit', hour12:true }) : 'Never';
+    const card = document.createElement('div');
+    card.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px;';
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:600;color:var(--text);">📱 ${dev.deviceName || 'Unnamed device'}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:3px;">👤 ${dev.empName || dev.empId}</div>
+          <div style="font-size:11px;color:var(--border2);margin-top:2px;">Last seen: ${lastSeen}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+          <button class="emp-manual-btn" onclick="window.unlockDevice('${dev.id}','${(dev.deviceName||'').replace(/'/g,"\\'")}')">Unlock</button>
+          <button class="emp-manual-btn" onclick="window.openReassignDevice('${dev.id}','${(dev.deviceName||'').replace(/'/g,"\\'")}')">Reassign</button>
+        </div>
+      </div>
+    `;
+    listEl.appendChild(card);
+  });
+}
+
+window.unlockDevice = async function(deviceId, deviceName) {
+  if (!confirm(`Unlock "${deviceName}"? The employee will need to log in again on their next visit.`)) return;
+  await setDoc(doc(db, 'devices', deviceId), { unlocked: true }, { merge: true });
+  showToast('Device unlocked');
+  await loadDeviceList();
+};
+
+window.openReassignDevice = function(deviceId, deviceName) {
+  const empOptions = employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+  const modal = document.createElement('div');
+  modal.id = 'reassign-modal-overlay';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--radius);padding:24px;width:100%;max-width:340px;box-shadow:var(--shadow-md);">
+      <div class="modal-title">Reassign Device</div>
+      <div class="modal-sub" style="margin-bottom:14px;">${deviceName}</div>
+      <div class="input-group">
+        <label class="input-label">Assign to employee</label>
+        <select class="text-input" id="reassign-emp-select" style="appearance:auto;">${empOptions}</select>
+      </div>
+      <div class="modal-actions">
+        <button class="cta-btn ghost" style="margin-bottom:0;flex:1;" onclick="document.getElementById('reassign-modal-overlay').remove()">Cancel</button>
+        <button class="cta-btn primary" style="margin-bottom:0;flex:1;" onclick="window.confirmReassign('${deviceId}')">Reassign</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+};
+
+window.confirmReassign = async function(deviceId) {
+  const empId = $('reassign-emp-select').value;
+  const emp = employees.find(e => e.id === empId);
+  if (!emp) return;
+  await setDoc(doc(db, 'devices', deviceId), {
+    empId: emp.id,
+    empName: emp.name,
+    unlocked: false,
+    reassignedAt: Date.now(),
+    lastSeen: Date.now()
+  }, { merge: true });
+  document.getElementById('reassign-modal-overlay').remove();
+  showToast(`Device reassigned to ${emp.name}`);
+  await loadDeviceList();
+};
+
+// ── Admin: View employee attendance ──
+let adminViewEmpId = null;
+window.viewEmpAttendance = async function(empId, empName) {
+  // If same employee clicked again, toggle it off
+  if (adminViewEmpId === empId) {
+    closeAdminView();
+    return;
+  }
+  // Close any previously open panel
+  closeAdminView();
+  adminViewEmpId = empId;
+
+  const panel = document.getElementById('view-panel-' + empId);
+  if (!panel) return;
+
+  panel.style.display = 'block';
+  panel.style.cssText = 'display:block;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-top:6px;box-shadow:var(--shadow-md);';
+  panel.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="font-size:13px;font-weight:600;color:var(--text);">${empName} — ${new Date().toLocaleString('en-IN',{month:'long',year:'numeric'})}</div>
+      <button class="back-btn" onclick="closeAdminView()" style="font-size:12px;padding:5px 10px;">✕ Close</button>
+    </div>
+    <div id="admin-attendance-content" style="color:var(--muted);font-size:13px;padding:4px 0;">Loading...</div>
+  `;
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+
+  const month = monthStr();
+  const now = new Date();
+  // Refresh holidays so any just-added entries are reflected here
+  await loadHolidays();
+  // Fetch employee doc for salary
+  const empDoc = await getDoc(doc(db,'employees',empId));
+  const empData = empDoc.exists() ? empDoc.data() : {};
+  const monthlySalary = empData.monthlySalary || 0;
+
+  const monthData = await getMonthRecords(empId, month);
+  const { workingDaysElapsed, daysPresent, holidaysElapsed, paidDays, absentDays } = computeMonthTotals(monthData, now);
+
+  // Salary calculation uses paidDays (present + holidays)
+  const salaryPayable = Math.round((monthlySalary * paidDays) / 30);
+  const dailyRate = Math.round(monthlySalary / 30);
+
+  const container = $('admin-attendance-content');
+  container.innerHTML = '';
+
+  // Summary row (4 cards when holidays exist, else 3)
+  const summary = document.createElement('div');
+  summary.style.cssText = 'display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;';
+  const presentCard = `
+    <div style="flex:1;min-width:80px;background:rgba(22,163,74,0.1);border:1px solid rgba(22,163,74,0.25);border-radius:10px;padding:10px;text-align:center;">
+      <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Present</div>
+      <div style="font-size:22px;font-weight:700;color:var(--success);margin-top:4px;">${daysPresent}</div>
+    </div>`;
+  const holidayCard = holidaysElapsed > 0 ? `
+    <div style="flex:1;min-width:80px;background:rgba(147,51,234,0.08);border:1px solid rgba(147,51,234,0.25);border-radius:10px;padding:10px;text-align:center;">
+      <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Holiday</div>
+      <div style="font-size:22px;font-weight:700;color:#7c3aed;margin-top:4px;">${holidaysElapsed}</div>
+    </div>` : '';
+  const absentCard = `
+    <div style="flex:1;min-width:80px;background:rgba(220,38,38,0.07);border:1px solid rgba(220,38,38,0.2);border-radius:10px;padding:10px;text-align:center;">
+      <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Absent</div>
+      <div style="font-size:22px;font-weight:700;color:var(--danger);margin-top:4px;">${absentDays}</div>
+    </div>`;
+  const workingCard = `
+    <div style="flex:1;min-width:80px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
+      <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Working</div>
+      <div style="font-size:22px;font-weight:700;color:var(--accent);margin-top:4px;">${workingDaysElapsed}</div>
+    </div>`;
+  summary.innerHTML = presentCard + holidayCard + absentCard + workingCard;
+  container.appendChild(summary);
+
+  // Salary card
+  if (monthlySalary > 0) {
+    const salaryCard = document.createElement('div');
+    salaryCard.style.cssText = 'background:linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%);border-radius:12px;padding:14px 16px;margin-bottom:16px;color:#fff;';
+    const breakdownLine = holidaysElapsed > 0
+      ? `${daysPresent} present + ${holidaysElapsed} holiday = ${paidDays} paid days × ₹${dailyRate.toLocaleString('en-IN')}/day`
+      : `${paidDays} days × ₹${dailyRate.toLocaleString('en-IN')}/day`;
+    const formulaLine = `Formula: ₹${monthlySalary.toLocaleString('en-IN')} × ${paidDays} paid days ÷ 30 = ₹${salaryPayable.toLocaleString('en-IN')}`;
+    salaryCard.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;opacity:0.75;margin-bottom:4px;">Salary Payable</div>
+          <div style="font-size:28px;font-weight:700;letter-spacing:-0.5px;">₹${salaryPayable.toLocaleString('en-IN')}</div>
+          <div style="font-size:11px;opacity:0.75;margin-top:4px;">${breakdownLine}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;opacity:0.75;margin-bottom:4px;">Monthly CTC</div>
+          <div style="font-size:16px;font-weight:600;opacity:0.9;">₹${monthlySalary.toLocaleString('en-IN')}</div>
+          <div style="font-size:11px;opacity:0.6;margin-top:2px;">÷ 30 days</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.15);font-size:11px;opacity:0.65;">
+        ${formulaLine}
+      </div>
+    `;
+    container.appendChild(salaryCard);
+  }
+
+  // Calendar
+  renderCalendarInto(container, monthData, now, true);
+
+  // ── Weekly averages ──
+  const checkedInRecords = monthData.filter(r => r.checkIn);
+  if (checkedInRecords.length) {
+    // Group by ISO week (Mon–Sun)
+    function getWeekKey(dateStr) {
+      const d = new Date(dateStr);
+      const dayOfWeek = d.getDay(); // 0=Sun
+      // Shift so week starts Monday
+      const diff = (dayOfWeek === 0) ? -6 : 1 - dayOfWeek;
+      const mon = new Date(d); mon.setDate(d.getDate() + diff);
+      return mon.toISOString().slice(0, 10);
+    }
+    const weekMap = {};
+    checkedInRecords.forEach(r => {
+      const wk = getWeekKey(r.date);
+      if (!weekMap[wk]) weekMap[wk] = [];
+      weekMap[wk].push(r);
+    });
+    const weeks = Object.keys(weekMap).sort();
+
+    const weekSection = document.createElement('div');
+    weekSection.style.cssText = 'margin-top:20px;';
+
+    const weekTitle = document.createElement('div');
+    weekTitle.className = 'section-title';
+    weekTitle.style.cssText = 'margin-bottom:10px;font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;';
+    weekTitle.textContent = 'Weekly Averages';
+    weekSection.appendChild(weekTitle);
+
+    // Overall averages across month
+    const allCiMins = checkedInRecords.map(r => { const d=new Date(r.checkIn); return d.getHours()*60+d.getMinutes(); });
+    const allCoMins = checkedInRecords.filter(r=>r.checkOut).map(r => { const d=new Date(r.checkOut); return d.getHours()*60+d.getMinutes(); });
+    function minsToAmPm(m) {
+      const h = Math.floor(m/60), mn = m%60, ampm = h>=12?'PM':'AM';
+      return `${h%12||12}:${String(mn).padStart(2,'0')} ${ampm}`;
+    }
+    const avgCiMins = Math.round(allCiMins.reduce((a,b)=>a+b,0)/allCiMins.length);
+    const avgCoMins = allCoMins.length ? Math.round(allCoMins.reduce((a,b)=>a+b,0)/allCoMins.length) : null;
+
+    // Overall summary bar
+    const overallBar = document.createElement('div');
+    overallBar.style.cssText = 'display:flex;gap:8px;margin-bottom:12px;';
+    overallBar.innerHTML = `
+      <div style="flex:1;background:rgba(37,99,235,0.07);border:1px solid rgba(37,99,235,0.2);border-radius:10px;padding:10px;text-align:center;">
+        <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.4px;">Avg Check-in</div>
+        <div style="font-size:17px;font-weight:700;color:var(--accent);margin-top:4px;">${minsToAmPm(avgCiMins)}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px;">this month</div>
+      </div>
+      <div style="flex:1;background:rgba(37,99,235,0.07);border:1px solid rgba(37,99,235,0.2);border-radius:10px;padding:10px;text-align:center;">
+        <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.4px;">Avg Check-out</div>
+        <div style="font-size:17px;font-weight:700;color:var(--accent);margin-top:4px;">${avgCoMins !== null ? minsToAmPm(avgCoMins) : '—'}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px;">this month</div>
+      </div>
+    `;
+    weekSection.appendChild(overallBar);
+
+    // Per-week breakdown
+    weeks.forEach(wkKey => {
+      const recs = weekMap[wkKey];
+      const wkStart = new Date(wkKey);
+      const wkEnd = new Date(wkKey); wkEnd.setDate(wkStart.getDate()+6);
+      const fmt = dt => dt.toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+      const wkLabel = `${fmt(wkStart)} – ${fmt(wkEnd)}`;
+
+      const wkCiMins = recs.map(r => { const d=new Date(r.checkIn); return d.getHours()*60+d.getMinutes(); });
+      const wkCoRecs = recs.filter(r=>r.checkOut);
+      const wkCoMins = wkCoRecs.map(r => { const d=new Date(r.checkOut); return d.getHours()*60+d.getMinutes(); });
+
+      const wkAvgCi = Math.round(wkCiMins.reduce((a,b)=>a+b,0)/wkCiMins.length);
+      const wkAvgCo = wkCoMins.length ? Math.round(wkCoMins.reduce((a,b)=>a+b,0)/wkCoMins.length) : null;
+
+      const lateCount = recs.filter(r => { const d=new Date(r.checkIn); return d.getHours()*60+d.getMinutes() > 10*60; }).length;
+
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;';
+      row.innerHTML = `
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--text);">${wkLabel}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${recs.length} day${recs.length!==1?'s':''} present${lateCount ? ` · <span style="color:#b45309;">${lateCount} late</span>` : ''}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:12px;font-weight:600;color:var(--accent);">↓ ${minsToAmPm(wkAvgCi)}</div>
+          <div style="font-size:12px;font-weight:600;color:var(--success);margin-top:2px;">${wkAvgCo !== null ? '↑ '+minsToAmPm(wkAvgCo) : '<span style="color:var(--muted);">No checkout</span>'}</div>
+        </div>
+      `;
+      weekSection.appendChild(row);
+    });
+
+    container.appendChild(weekSection);
+  }
+
+  // Location log — show days with GPS on check-in OR check-out
+  const gpsRecords = monthData.filter(r => r.checkIn && (r.checkInLat != null || r.checkOutLat != null));
+  if (gpsRecords.length) {
+    const locTitle = document.createElement('div');
+    locTitle.className = 'section-title';
+    locTitle.style.cssText = 'margin-top:20px;margin-bottom:10px;';
+    locTitle.textContent = 'Check-in / Check-out Locations';
+    container.appendChild(locTitle);
+
+    gpsRecords.slice().reverse().forEach(r => {
+      const row = document.createElement('div');
+      row.style.cssText = 'padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;font-size:12px;';
+
+      // Check-in chip
+      const ciDistOk = r.checkInDistanceM != null && r.checkInDistanceM <= STORE_RADIUS_M;
+      const ciMapsUrl = r.checkInLat != null ? `https://www.google.com/maps?q=${r.checkInLat},${r.checkInLng}` : null;
+      let ciChip = '';
+      if (r.checkInLat != null) {
+        ciChip = `<span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:${ciDistOk?'rgba(22,163,74,0.1)':'rgba(220,38,38,0.1)'};color:${ciDistOk?'var(--success)':'var(--danger)'};">📍 ${r.checkInDistanceM}m</span> <a href="${ciMapsUrl}" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:none;font-weight:500;">Map ↗</a>`;
+      }
+
+      // Check-out chip
+      let coChip = '';
+      if (r.checkOutLat != null) {
+        const coDistOk = !r.checkOutOutsideFence;
+        const coMapsUrl = `https://www.google.com/maps?q=${r.checkOutLat},${r.checkOutLng}`;
+        coChip = `<span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:${coDistOk?'rgba(22,163,74,0.1)':'rgba(217,119,6,0.12)'};color:${coDistOk?'var(--success)':'var(--warning)'};">📤 ${r.checkOutDistanceM}m${r.checkOutOutsideFence?' ⚠ off-site':''}</span> <a href="${coMapsUrl}" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:none;font-weight:500;">Map ↗</a>`;
+      } else if (r.checkOut && r.checkOutGpsUnavailable) {
+        coChip = `<span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:var(--surface2);color:var(--muted);">📤 no GPS</span>`;
+      }
+
+      row.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;color:var(--text);">${fmtDate(r.date)}</div>
+            <div style="color:var(--muted);margin-top:2px;">In: ${fmtTime(r.checkIn)}${r.checkOut?' · Out: '+fmtTime(r.checkOut):''}</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px 10px;margin-top:6px;align-items:center;">
+          ${ciChip}${coChip ? (ciChip ? ' · ' : '') + coChip : ''}
+        </div>
+      `;
+      container.appendChild(row);
+    });
+  }
+};
+
+window.closeAdminView = function() {
+  if (adminViewEmpId) {
+    const panel = document.getElementById('view-panel-' + adminViewEmpId);
+    if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
+    adminViewEmpId = null;
+  }
+};
+
+// ── Admin: Reset employee PIN ──
+let pinResetTargetId = null;
+window.openPinResetModal = function(empId, empName) {
+  pinResetTargetId = empId;
+  $('pin-reset-sub').textContent = `Set new PIN for ${empName}`;
+  $('pin-reset-value').value = '';
+  $('pin-reset-modal').classList.add('open');
+};
+window.closePinResetModal = function() {
+  $('pin-reset-modal').classList.remove('open');
+  pinResetTargetId = null;
+};
+window.saveResetPin = async function() {
+  const newPin = $('pin-reset-value').value.trim();
+  if (!/^\d{6}$/.test(newPin)) { showToast('PIN must be exactly 6 digits'); return; }
+  const salt = randomSaltB64();
+  const pinHash = await hashPin(newPin, salt);
+  // Write new hash fields; null out any legacy plaintext pin.
+  await setDoc(doc(db,'employees',pinResetTargetId), {
+    pinHash, pinSalt: salt, pinIters: PBKDF2_ITERS, pin: null
+  }, { merge: true });
+  // Also clear any lockout on this employee
+  clearLockout('emp', pinResetTargetId);
+  showToast('PIN reset successfully');
+  closePinResetModal();
+};
+
+// ── Admin: Edit employee details ──
+let editEmpTargetId = null;
+window.openEditEmpModal = function(empId, empName, designation, salary) {
+  editEmpTargetId = empId;
+  $('edit-emp-sub').textContent = `Editing: ${empName}`;
+  $('edit-emp-designation').value = designation;
+  $('edit-emp-salary').value = salary;
+  $('edit-emp-modal').classList.add('open');
+};
+window.closeEditEmpModal = function() {
+  $('edit-emp-modal').classList.remove('open');
+  editEmpTargetId = null;
+};
+window.saveEditEmp = async function() {
+  const designation = $('edit-emp-designation').value.trim();
+  const salary = parseInt($('edit-emp-salary').value);
+  if (!designation) { showToast('Enter a designation'); return; }
+  if (!salary || salary < 1) { showToast('Enter a valid salary'); return; }
+  await setDoc(doc(db,'employees', editEmpTargetId), { designation, monthlySalary: salary }, { merge: true });
+  showToast('Employee updated');
+  closeEditEmpModal();
+  await loadAdminPanel();
+};
+
+// ── Employee: Change own PIN ──
+window.openEmpPinModal = function() {
+  $('emp-pin-current').value=''; $('emp-pin-new').value=''; $('emp-pin-confirm').value='';
+  $('emp-pin-modal').classList.add('open');
+};
+window.closeEmpPinModal = function() {
+  $('emp-pin-modal').classList.remove('open');
+};
+window.saveEmpPin = async function() {
+  const current = $('emp-pin-current').value.trim();
+  const newPin = $('emp-pin-new').value.trim();
+  const confirm2 = $('emp-pin-confirm').value.trim();
+  // Verify current PIN using whatever fields exist (hash preferred)
+  const ok = await verifyEmployeePin(currentEmp, current);
+  if (!ok) { showToast('Current PIN is incorrect'); return; }
+  if (!/^\d{6}$/.test(newPin)) { showToast('New PIN must be exactly 6 digits'); return; }
+  if (newPin !== confirm2) { showToast('New PINs do not match'); return; }
+  const salt = randomSaltB64();
+  const pinHash = await hashPin(newPin, salt);
+  await setDoc(doc(db,'employees',currentEmp.id), {
+    pinHash, pinSalt: salt, pinIters: PBKDF2_ITERS, pin: null
+  }, { merge: true });
+  // Update in-memory copy so subsequent verifies work without refetch
+  currentEmp.pinHash = pinHash;
+  currentEmp.pinSalt = salt;
+  currentEmp.pinIters = PBKDF2_ITERS;
+  delete currentEmp.pin;
+  showToast('PIN updated successfully');
+  closeEmpPinModal();
+};
+
+window.saveSettings = async function() {
+  const newPin = $('cfg-admin-pin').value.trim();
+  if (newPin && newPin.length < 1) { showToast('Password cannot be empty'); return; }
+  // Non-password settings stay in localStorage
+  const s = {
+    startTime: $('cfg-start-time').value || '09:00',
+    graceMins: parseInt($('cfg-grace').value)||15,
+    // Keep adminPin key so legacy fallback still works until migration; updated via Firestore below
+    adminPin: settings().adminPin,
+  };
+  localStorage.setItem(LS_SETTINGS, JSON.stringify(s));
+  // Admin password change → write hash to Firestore
+  if (newPin) {
+    try {
+      await writeAdminPin(newPin);
+      showToast('Settings saved · Admin password updated');
+    } catch(e) {
+      console.error(e);
+      showToast('Settings saved — but admin password update failed');
+    }
+  } else {
+    showToast('Settings saved');
+  }
+  $('cfg-admin-pin').value='';
+};
+
+// ── Store geofence settings ──
+window.useCurrentLocationForStore = async function() {
+  const statusEl = $('store-settings-status');
+  statusEl.textContent = 'Getting your location…';
+  statusEl.style.color = 'var(--muted)';
+  try {
+    const pos = await getLocation();
+    $('cfg-store-lat').value = pos.coords.latitude.toFixed(6);
+    $('cfg-store-lng').value = pos.coords.longitude.toFixed(6);
+    statusEl.textContent = '✓ Filled from your current location (accuracy ~' + Math.round(pos.coords.accuracy) + 'm). Click Save to apply.';
+    statusEl.style.color = 'var(--success)';
+  } catch(e) {
+    statusEl.textContent = '✗ Could not get location. Please allow GPS access and try again.';
+    statusEl.style.color = 'var(--danger)';
+  }
+};
+
+window.saveStoreSettings = async function() {
+  const lat = parseFloat($('cfg-store-lat').value);
+  const lng = parseFloat($('cfg-store-lng').value);
+  const radiusM = parseInt($('cfg-store-radius').value);
+  const statusEl = $('store-settings-status');
+  if (!isFinite(lat) || lat < -90 || lat > 90)    { showToast('Latitude must be between -90 and 90'); return; }
+  if (!isFinite(lng) || lng < -180 || lng > 180)  { showToast('Longitude must be between -180 and 180'); return; }
+  if (!isFinite(radiusM) || radiusM < 10 || radiusM > 500) { showToast('Radius must be between 10 and 500 metres'); return; }
+  try {
+    await setDoc(doc(db, 'settings', 'store'), {
+      lat, lng, radiusM, updatedAt: Date.now()
+    }, { merge: true });
+    STORE_LAT = lat;
+    STORE_LNG = lng;
+    STORE_RADIUS_M = radiusM;
+    statusEl.textContent = '✓ Store location saved';
+    statusEl.style.color = 'var(--success)';
+    showToast('Store location saved');
+  } catch(e) {
+    statusEl.textContent = '✗ Save failed: ' + e.message;
+    statusEl.style.color = 'var(--danger)';
+    console.error(e);
+  }
+};
+
+// ── Holiday management ──
+window.addHoliday = async function() {
+  const date = $('new-holiday-date').value;
+  const reason = $('new-holiday-reason').value.trim();
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { showToast('Please pick a valid date'); return; }
+  try {
+    await setDoc(doc(db, 'holidays', date), {
+      date,
+      reason: reason || 'Holiday',
+      createdAt: Date.now()
+    });
+    holidays[date] = { date, reason: reason || 'Holiday', createdAt: Date.now() };
+    $('new-holiday-date').value = '';
+    $('new-holiday-reason').value = '';
+    showToast(`Holiday added: ${fmtDate(date)}`);
+    renderHolidaysList();
+  } catch(e) {
+    showToast('Could not add holiday: ' + e.message);
+    console.error(e);
+  }
+};
+
+window.removeHoliday = async function(dateStr) {
+  if (!confirm(`Remove holiday on ${fmtDate(dateStr)}? This will affect future salary calculations.`)) return;
+  try {
+    await deleteDoc(doc(db, 'holidays', dateStr));
+    delete holidays[dateStr];
+    showToast('Holiday removed');
+    renderHolidaysList();
+  } catch(e) {
+    showToast('Could not remove holiday: ' + e.message);
+    console.error(e);
+  }
+};
+
+function renderHolidaysList() {
+  const el = $('holidays-list');
+  if (!el) return;
+  const keys = Object.keys(holidays).sort();
+  if (!keys.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0;">No holidays declared yet.</div>';
+    return;
+  }
+  el.innerHTML = '';
+  keys.forEach(dateStr => {
+    const h = holidays[dateStr];
+    const isPast = dateStr < todayStr();
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;';
+    row.innerHTML = `
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;color:var(--text);${isPast?'opacity:0.7;':''}">🎉 ${fmtDate(dateStr)}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">${h.reason || 'Holiday'}${isPast ? ' · past' : ''}</div>
+      </div>
+      <button class="emp-delete-btn" onclick="window.removeHoliday('${dateStr}')">Remove</button>
+    `;
+    el.appendChild(row);
+  });
+}
+
+// ── Manual Attendance ──
+window.openManualModal = function(empId, empName) {
+  manualTargetEmp = { id: empId, name: empName };
+  $('manual-modal-sub').textContent = `Mark attendance for ${empName}`;
+  $('manual-date').value = todayStr();
+  $('manual-checkin').value = '09:00';
+  $('manual-checkout').value = '';
+  $('manual-modal').classList.add('open');
+};
+
+window.closeManualModal = function() {
+  $('manual-modal').classList.remove('open');
+  manualTargetEmp = null;
+};
+
+window.saveManualAttendance = async function() {
+  if (!manualTargetEmp) return;
+  const date = $('manual-date').value;
+  const ciTime = $('manual-checkin').value;
+  const coTime = $('manual-checkout').value;
+  if (!date || !ciTime) { showToast('Date and check-in time are required'); return; }
+  const [cy,cm,cd] = date.split('-').map(Number);
+  const [ch,cmin] = ciTime.split(':').map(Number);
+  const checkInTs = new Date(cy,cm-1,cd,ch,cmin,0).getTime();
+  const ref = doc(db,'attendance',`${manualTargetEmp.id}_${date}`);
+  const data = { checkIn: checkInTs, employeeId: manualTargetEmp.id, date, manualEntry: true };
+  if (coTime) {
+    const [oh,omin] = coTime.split(':').map(Number);
+    data.checkOut = new Date(cy,cm-1,cd,oh,omin,0).getTime();
+  }
+  await setDoc(ref, data, { merge: true });
+  showToast(`Attendance marked for ${manualTargetEmp.name}`);
+  closeManualModal();
+};
+
+// ── Pre-configured Firebase ──
+const EMBEDDED_CONFIG = {
+  apiKey: "AIzaSyASxUgNv56ayeCNH9niYcSyY9TRlYsWap4",
+  authDomain: "attendance-2d879.firebaseapp.com",
+  projectId: "attendance-2d879",
+  storageBucket: "attendance-2d879.firebasestorage.app",
+  messagingSenderId: "878446144077",
+  appId: "1:878446144077:web:579f0befe06849cd5aca04"
+};
+
+// ── Boot ──
+async function boot() {
+  showScreen('screen-select');
+  $('select-date-str').textContent = fmtDate(todayStr());
+  $('emp-list').innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:32px 0;">Connecting...</div>';
+
+  try {
+    localStorage.setItem(LS_CONFIG, JSON.stringify(EMBEDDED_CONFIG));
+    await initFirebase(EMBEDDED_CONFIG);
+
+    // Load store geofence settings (falls back to defaults if missing)
+    await loadStoreSettings();
+    // Load holiday list for calendar/salary math
+    await loadHolidays();
+    // Load admin config (hashed PIN); null if not yet migrated
+    await loadAdminConfig();
+
+    const deviceId = getOrCreateDeviceId();
+
+    // Check Firestore for a device lock
+    const deviceDoc = await getDoc(doc(db, 'devices', deviceId));
+    if (deviceDoc.exists()) {
+      const deviceData = deviceDoc.data();
+      if (deviceData.empId && !deviceData.unlocked) {
+        // Device is locked — load employee and go straight to PIN screen
+        employees = await fetchEmployees();
+        const emp = employees.find(e => e.id === deviceData.empId);
+        if (emp) {
+          // Store device name for after login
+          currentDeviceName = deviceData.deviceName || '';
+          await setDoc(doc(db, 'devices', deviceId), { lastSeen: Date.now() }, { merge: true });
+          openPin(emp, true);
+          return;
+        }
+      }
+    }
+
+    // No device lock — show select screen normally
+    await loadSelectScreen();
+  } catch(e) {
+    console.error('Firebase init failed', e);
+    $('emp-list').innerHTML = '<div style="color:var(--danger);font-size:13px;text-align:center;padding:32px 0;">Could not connect. Check your internet and refresh.</div>';
+  }
+}
+boot();
+
+// ── Load SheetJS helper ──
+async function loadXLSX() {
+  if (window.XLSX) return;
+  await new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+// ── Parse time value → timestamp on a given YYYY-MM-DD ──
+// Handles: "9:05 AM", "9:05", Excel numeric fraction (0.395 = 9:28 AM)
+function parseTimeToTs(dateStr, val) {
+  if (val === null || val === undefined || val === '') return null;
+  const d = new Date(dateStr + 'T00:00:00'); // local midnight
+
+  // Excel stores times as decimal fraction of a day (e.g. 9:30 AM = 0.395833)
+  if (typeof val === 'number' && val >= 0 && val < 1) {
+    const totalMins = Math.round(val * 24 * 60);
+    d.setHours(Math.floor(totalMins / 60), totalMins % 60, 0, 0);
+    return d.getTime();
+  }
+
+  const timeStr = String(val).trim();
+
+  // Try AM/PM: "9:05 AM"
+  let match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (match) {
+    let h = parseInt(match[1]), m = parseInt(match[2]);
+    const ap = match[3].toUpperCase();
+    if (ap === 'PM' && h !== 12) h += 12;
+    if (ap === 'AM' && h === 12) h = 0;
+    d.setHours(h, m, 0, 0);
+    return d.getTime();
+  }
+  // Try 24h: "14:30"
+  match = timeStr.match(/^(\d{1,2}):(\d{2})$/);
+  if (match) {
+    d.setHours(parseInt(match[1]), parseInt(match[2]), 0, 0);
+    return d.getTime();
+  }
+  return null;
+}
+
+// ── Backup helpers ──
+const LS_LAST_BACKUP = 'ci_last_weekly_backup';
+
+async function buildFullBackupJson() {
+  const emps = await fetchEmployees();
+  // fetch ALL attendance records for ALL employees
+  const allAttSnap = await getDocs(collection(db, 'attendance'));
+  const attendance = {};
+  allAttSnap.forEach(d => { attendance[d.id] = d.data(); });
+  return {
+    exportedAt: new Date().toISOString(),
+    version: 1,
+    employees: emps,
+    attendance
+  };
+}
+
+window.downloadFullBackup = async function(silent = false) {
+  const btn = $('backup-btn');
+  const status = $('backup-status');
+  if (!silent) { btn.disabled = true; btn.textContent = '⏳ Building backup…'; status.textContent = ''; }
+  try {
+    await loadXLSX();
+    const payload = await buildFullBackupJson();
+
+    // ── JSON blob ──
+    const jsonStr = JSON.stringify(payload, null, 2);
+    const jsonBlob = new Blob([jsonStr], { type: 'application/json' });
+
+    // ── Excel workbook ──
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Employees
+    const empHeader = ['ID', 'Name', 'Designation', 'Monthly Salary', 'PIN', 'Created At'];
+    const empRows = [empHeader, ...payload.employees.map(e => [
+      e.id, e.name, e.designation||'', e.monthlySalary||'', e.pin||'',
+      e.createdAt ? new Date(e.createdAt).toLocaleString('en-IN') : ''
+    ])];
+    const wsEmp = XLSX.utils.aoa_to_sheet(empRows);
+    wsEmp['!cols'] = [{wch:20},{wch:22},{wch:18},{wch:15},{wch:8},{wch:22}];
+    XLSX.utils.book_append_sheet(wb, wsEmp, 'Employees');
+
+    // Sheet 2: Attendance
+    const attHeader = ['Doc ID', 'Employee ID', 'Date', 'Check-in', 'Check-out', 'Check-in Lat', 'Check-in Lng', 'Distance (m)', 'Manual'];
+    const attRows = [attHeader];
+    Object.entries(payload.attendance).forEach(([id, r]) => {
+      attRows.push([
+        id, r.employeeId||'', r.date||'',
+        r.checkIn  ? new Date(r.checkIn).toLocaleString('en-IN')  : '',
+        r.checkOut ? new Date(r.checkOut).toLocaleString('en-IN') : '',
+        r.checkInLat||'', r.checkInLng||'', r.checkInDistanceM||'',
+        r.manualEntry||r.importedManually ? 'Yes' : ''
+      ]);
+    });
+    const wsAtt = XLSX.utils.aoa_to_sheet(attRows);
+    wsAtt['!cols'] = [{wch:28},{wch:20},{wch:13},{wch:22},{wch:22},{wch:12},{wch:12},{wch:12},{wch:7}];
+    XLSX.utils.book_append_sheet(wb, wsAtt, 'Attendance');
+
+    const dateTag = new Date().toISOString().slice(0,10);
+
+    // Download JSON
+    const jsonA = document.createElement('a');
+    jsonA.href = URL.createObjectURL(jsonBlob);
+    jsonA.download = `ClockIt_Backup_${dateTag}.json`;
+    jsonA.click();
+
+    // Download Excel
+    XLSX.writeFile(wb, `ClockIt_Backup_${dateTag}.xlsx`);
+
+    if (!silent) {
+      status.textContent = `✓ Backup downloaded (${payload.employees.length} employees, ${Object.keys(payload.attendance).length} records)`;
+      status.style.color = 'var(--success)';
+    }
+  } catch(e) {
+    if (!silent) { status.textContent = '✗ Backup failed: ' + e.message; status.style.color = 'var(--danger)'; }
+    console.error(e);
+    throw e;
+  } finally {
+    if (!silent) { btn.disabled = false; btn.textContent = '⬇ Backup Now'; }
+  }
+};
+
+// ── Restore from JSON backup ──
+window.restoreFromJson = async function(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+  const status = $('backup-status');
+  status.textContent = 'Reading backup file…';
+  status.style.color = 'var(--muted)';
+  try {
+    const text = await file.text();
+    const payload = JSON.parse(text);
+    if (!payload.employees || !payload.attendance) throw new Error('Invalid backup file format');
+
+    const confirmed = confirm(
+      `Restore backup from ${payload.exportedAt ? new Date(payload.exportedAt).toLocaleString('en-IN') : 'unknown date'}?\n\n` +
+      `This will write ${payload.employees.length} employees and ${Object.keys(payload.attendance).length} attendance records to Firestore.\n\n` +
+      `Existing records with the same IDs will be overwritten.`
+    );
+    if (!confirmed) { status.textContent = 'Restore cancelled.'; return; }
+
+    status.textContent = 'Restoring employees…';
+    let empCount = 0;
+    for (const emp of payload.employees) {
+      const { id, ...data } = emp;
+      await setDoc(doc(db, 'employees', id), data, { merge: true });
+      empCount++;
+    }
+
+    status.textContent = 'Restoring attendance records…';
+    let attCount = 0;
+    const entries = Object.entries(payload.attendance);
+    for (const [docId, data] of entries) {
+      await setDoc(doc(db, 'attendance', docId), data, { merge: true });
+      attCount++;
+      if (attCount % 20 === 0) {
+        status.textContent = `Restoring attendance… ${attCount}/${entries.length}`;
+      }
+    }
+
+    status.textContent = `✓ Restored ${empCount} employees and ${attCount} attendance records`;
+    status.style.color = 'var(--success)';
+    showToast('Restore complete!');
+  } catch(e) {
+    status.textContent = '✗ Restore failed: ' + e.message;
+    status.style.color = 'var(--danger)';
+    console.error(e);
+  }
+};
+
+// ── Auto clock-out at 7:30 PM ──
+// Runs every minute. At 7:30 PM, writes a checkOut for any employee who checked in
+// today but has not yet clocked out. Records are flagged with autoClockOut:true.
+const AUTO_CLOCKOUT_HOUR   = 19;  // 7 PM
+const AUTO_CLOCKOUT_MINUTE = 30;  // :30
+
+async function runAutoClockOut() {
+  if (!db) return;
+  const now = new Date();
+  if (now.getHours() !== AUTO_CLOCKOUT_HOUR || now.getMinutes() !== AUTO_CLOCKOUT_MINUTE) return;
+
+  const today = todayStr();
+  const LS_AUTO_CO_KEY = 'ci_auto_co_' + today;
+  if (localStorage.getItem(LS_AUTO_CO_KEY)) return; // already ran today
+  localStorage.setItem(LS_AUTO_CO_KEY, '1');
+
+  // Build the 7:30 PM timestamp for today
+  const coTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(),
+                          AUTO_CLOCKOUT_HOUR, AUTO_CLOCKOUT_MINUTE, 0, 0).getTime();
+
+  try {
+    const emps = await fetchEmployees();
+    let count = 0;
+    for (const emp of emps) {
+      const ref  = doc(db, 'attendance', `${emp.id}_${today}`);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) continue;
+      const data = snap.data();
+      if (!data.checkIn || data.checkOut) continue; // not checked in, or already out
+      await setDoc(ref, { checkOut: coTime, autoClockOut: true }, { merge: true });
+      count++;
+    }
+    if (count > 0) {
+      console.log(`[ClockIt] Auto clock-out applied to ${count} employee(s) at 7:30 PM`);
+      // Refresh the current screen if we are looking at today's dashboard
+      if (currentEmp && todayRecord && !todayRecord.checkOut) {
+        todayRecord = { ...todayRecord, checkOut: coTime };
+        renderCheckInOut();
+      }
+      if (typeof loadDashboard === 'function' && currentEmp) {
+        await loadDashboard(currentEmp);
+      }
+    }
+  } catch(e) {
+    console.warn('[ClockIt] Auto clock-out failed:', e);
+  }
+}
+
+// Poll every 60 seconds
+setInterval(runAutoClockOut, 60 * 1000);
+
+// ── Weekly auto-backup scheduler (auto-downloads on Mondays when admin opens panel) ──
+async function maybeRunWeeklyBackup() {
+  const now = new Date();
+  // Only run on Mondays (day 1)
+  if (now.getDay() !== 1) return;
+
+  const lastRun = parseInt(localStorage.getItem(LS_LAST_BACKUP) || '0');
+  const sixDaysMs = 6 * 24 * 60 * 60 * 1000;
+  if (Date.now() - lastRun < sixDaysMs) return; // already ran this week
+
+  try {
+    await window.downloadFullBackup(true); // silent=true: skip button state changes
+    localStorage.setItem(LS_LAST_BACKUP, String(Date.now()));
+    const infoEl = $('weekly-backup-info');
+    if (infoEl) infoEl.textContent = `✓ Weekly backup downloaded — ${now.toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}`;
+    console.log('[ClockIt] Weekly backup downloaded');
+  } catch(e) {
+    console.warn('[ClockIt] Weekly backup failed:', e);
+  }
+}
+
+// ── Export attendance as Excel ──
+window.exportAttendanceExcel = async function() {
+  showToast('Preparing export…');
+  await loadXLSX();
+  // Ensure holidays are loaded so the export reflects them
+  await loadHolidays();
+
+  const emps = await fetchEmployees();
+  const month = monthStr();
+  const now = new Date();
+  const year = now.getFullYear();
+  const mon = now.getMonth();
+  const daysInMonth = new Date(year, mon + 1, 0).getDate();
+
+  // Columns: Employee Name | Date | Day | Status | Check-in | Check-out | Notes
+  //   Status ∈ { Present, Absent, Holiday }
+  //   Check-in / Check-out are BLANK on Absent and Holiday (unless worked).
+  const header = ['Employee Name', 'Date', 'Day', 'Status', 'Check-in', 'Check-out', 'Notes'];
+  const wb = XLSX.utils.book_new();
+  const wsData = [header];
+
+  for (const emp of emps) {
+    const monthData = await getMonthRecords(emp.id, month);
+    const lookup = {};
+    monthData.forEach(r => { lookup[r.date] = r; });
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${year}-${pad(mon+1)}-${pad(d)}`;
+      const dow = new Date(year, mon, d).getDay();
+      if (dow === 0) continue; // skip Sundays
+      const isFuture = d > now.getDate();
+      if (isFuture) continue; // skip future
+
+      const dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dow];
+      const rec = lookup[dateStr];
+      const isHol = isHoliday(dateStr);
+      let status, ciStr, coStr, notes = '';
+
+      if (rec?.checkIn) {
+        status = 'Present';
+        ciStr = fmtTime(rec.checkIn);
+        coStr = rec.checkOut ? fmtTime(rec.checkOut) : ''; // blank if still in / no checkout
+        if (isHol) notes = `Worked on holiday: ${holidays[dateStr]?.reason || 'Holiday'}`;
+        if (rec.checkOutOutsideFence) notes += (notes ? ' · ' : '') + 'Off-site checkout';
+        if (rec.autoClockOut) notes += (notes ? ' · ' : '') + 'Auto-clocked out at 7:30 PM';
+      } else if (isHol) {
+        status = 'Holiday';
+        ciStr = '';
+        coStr = '';
+        notes = holidays[dateStr]?.reason || 'Holiday';
+      } else {
+        status = 'Absent';
+        ciStr = '';
+        coStr = '';
+      }
+
+      wsData.push([emp.name, dateStr, dayName, status, ciStr, coStr, notes]);
+    }
+    // blank row between employees
+    wsData.push(['', '', '', '', '', '', '']);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  // Column widths
+  ws['!cols'] = [{wch:22},{wch:13},{wch:6},{wch:10},{wch:12},{wch:12},{wch:32}];
+  // Freeze top row
+  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
+  const monthLabel = now.toLocaleString('en-IN', {month:'long', year:'numeric'});
+  XLSX.writeFile(wb, `ClockIt_${monthLabel.replace(' ','_')}.xlsx`);
+  showToast('Exported!');
+};
+
+// ── Import attendance from Excel ──
+window.importAttendanceExcel = async function(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+  const statusEl = $('import-status');
+  statusEl.textContent = 'Reading file…';
+  statusEl.style.color = 'var(--muted)';
+
+  try {
+    await loadXLSX();
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data, { type: 'array', cellDates: false });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    // raw:false resolves shared strings and formats times as "9:30 AM"
+    // booleans still come through as true/false
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+
+    const emps = await fetchEmployees();
+    const empByName = {};
+    emps.forEach(e => { empByName[e.name.trim().toLowerCase()] = e; });
+
+    let imported = 0, skipped = 0, absent = 0, holiday = 0, missingTimes = 0;
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || !row[0] || !row[1]) continue; // blank separator row
+
+      const empName = String(row[0]).trim().toLowerCase();
+      const dateStr  = String(row[1]).trim(); // YYYY-MM-DD
+      const statusRaw = row[3];
+      const ciRaw  = row[4] ? String(row[4]).trim() : '';
+      const coRaw  = row[5] ? String(row[5]).trim() : '';
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) { skipped++; continue; }
+
+      const emp = empByName[empName];
+      if (!emp) { skipped++; continue; }
+
+      // Determine status. New format uses "Present"/"Absent"/"Holiday" strings.
+      // Fall back to old boolean Present interpretation for backward compatibility.
+      let status = 'present';
+      if (typeof statusRaw === 'string') {
+        const s = statusRaw.trim().toLowerCase();
+        if (s === 'present' || s === 'true' || s === 'yes' || s === '1') status = 'present';
+        else if (s === 'absent' || s === 'false' || s === 'no' || s === '0') status = 'absent';
+        else if (s === 'holiday') status = 'holiday';
+        else status = 'unknown';
+      } else if (statusRaw === true || statusRaw === 1) {
+        status = 'present';
+      } else if (statusRaw === false || statusRaw === 0) {
+        status = 'absent';
+      } else {
+        status = 'unknown';
+      }
+
+      if (status === 'absent')  { absent++;  continue; } // no record written
+      if (status === 'holiday') { holiday++; continue; } // holidays are declared separately
+      if (status === 'unknown') { skipped++; continue; }
+
+      // status === 'present' — require real check-in time; don't fabricate
+      if (!ciRaw) { missingTimes++; continue; }
+
+      const ciTs = parseTimeToTs(dateStr, ciRaw);
+      const coTs = coRaw ? parseTimeToTs(dateStr, coRaw) : null;
+
+      if (!ciTs) { skipped++; continue; }
+
+      const ref = doc(db, 'attendance', `${emp.id}_${dateStr}`);
+      const payload = { checkIn: ciTs, employeeId: emp.id, date: dateStr, importedManually: true };
+      if (coTs) payload.checkOut = coTs;
+      await setDoc(ref, payload, { merge: true });
+      imported++;
+    }
+
+    const parts = [];
+    if (absent)        parts.push(absent + ' absent');
+    if (holiday)       parts.push(holiday + ' holiday');
+    if (missingTimes)  parts.push(missingTimes + ' missing check-in time');
+    if (skipped)       parts.push(skipped + ' skipped');
+    const extras = parts.length ? ' · ' + parts.join(' · ') : '';
+    const msg = `✓ ${imported} record${imported!==1?'s':''} imported${extras}`;
+    statusEl.textContent = msg;
+    statusEl.style.color = imported > 0 ? 'var(--success)' : 'var(--warning)';
+    showToast(msg);
+  } catch(e) {
+    statusEl.textContent = '✗ Import failed — check the file format';
+    statusEl.style.color = 'var(--danger)';
+    console.error(e);
+  }
+};
+</script>
+</body>
+</html>
