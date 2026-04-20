@@ -774,11 +774,9 @@
     <div style="width:100%;max-width:320px;margin:24px auto 0;">
       <input class="text-input" id="admin-pw-input" type="password" maxlength="24"
              placeholder="Password" autocomplete="current-password"
-             style="font-size:16px;letter-spacing:0.05em;text-align:center;"
-             oninput="$('admin-pw-error').textContent=''"
-             onkeydown="if(event.key==='Enter') checkAdminPin()"/>
+             style="font-size:16px;letter-spacing:0.05em;text-align:center;"/>
       <div id="admin-pw-error" style="color:var(--danger);font-size:12px;text-align:center;margin-top:8px;min-height:18px;"></div>
-      <button class="cta-btn primary" onclick="checkAdminPin()" style="width:100%;margin-top:12px;">Unlock →</button>
+      <button class="cta-btn primary" id="admin-pw-btn" style="width:100%;margin-top:12px;">Unlock →</button>
     </div>
   </div>
 </div>
@@ -2011,6 +2009,18 @@ async function checkAdminPin() {
   await loadAdminPanel();
   if (errEl) errEl.textContent = '';
   showScreen('screen-admin');
+}
+
+// Wire up admin login inputs (inline handlers can't reach module scope)
+{
+  const adminInput = $('admin-pw-input');
+  const adminBtn   = $('admin-pw-btn');
+  const adminErr   = $('admin-pw-error');
+  if (adminInput) {
+    adminInput.addEventListener('input',   () => { if (adminErr) adminErr.textContent = ''; });
+    adminInput.addEventListener('keydown', e  => { if (e.key === 'Enter') checkAdminPin(); });
+  }
+  if (adminBtn) adminBtn.addEventListener('click', () => checkAdminPin());
 }
 
 async function loadAdminPanel() {
