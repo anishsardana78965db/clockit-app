@@ -921,13 +921,7 @@
     <input type="file" id="restore-json-input" accept=".json" style="display:none;" onchange="window.restoreFromJson(this)"/>
     <div id="backup-status" style="font-size:12px;color:var(--muted);min-height:16px;"></div>
 
-    <div style="margin-top:14px;padding:12px 14px;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border);display:flex;align-items:center;gap:10px;">
-      <div style="font-size:20px;line-height:1;">🗓</div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:600;margin-bottom:2px;">Weekly Auto-Backup</div>
-        <div id="weekly-backup-info" style="font-size:12px;color:var(--muted);line-height:1.4;">Every Monday when you open admin, both files download automatically.</div>
-      </div>
-    </div>
+    <div id="last-backup-info" style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;"></div>
   </div>
 
   <div class="divider"></div>
@@ -2064,14 +2058,8 @@ async function loadAdminPanel() {
   // Holidays — refresh from Firestore and populate list
   await loadHolidays();
   renderHolidaysList();
-  // Show last backup date in the weekly backup info pill
-  const lastRun = parseInt(localStorage.getItem(LS_LAST_BACKUP) || '0');
-  const infoEl = $('weekly-backup-info');
-  if (infoEl && lastRun) {
-    infoEl.textContent = `Last auto-backup: ${new Date(lastRun).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })} · runs every Monday`;
-  }
-  // Trigger weekly auto-backup silently in background
-  maybeRunWeeklyBackup().catch(() => {});
+  // Show last backup reminder
+  updateLastBackupUI();
   await loadDeviceList();
   const list = $('admin-emp-list');
   list.innerHTML = '';
@@ -2844,19 +2832,45 @@ function parseTimeToTs(dateStr, val) {
 }
 
 // ── Backup helpers ──
-const LS_LAST_BACKUP = 'ci_last_weekly_backup';
+const LS_LAST_BACKUP = 'ci_last_manual_backup';
 
 async function buildFullBackupJson() {
   const emps = await fetchEmployees();
-  // fetch ALL attendance records for ALL employees
+
+  // Attendance — all records
   const allAttSnap = await getDocs(collection(db, 'attendance'));
   const attendance = {};
   allAttSnap.forEach(d => { attendance[d.id] = d.data(); });
+
+  // Holidays
+  const holidaysSnap = await getDocs(collection(db, 'holidays'));
+  const holidays = {};
+  holidaysSnap.forEach(d => { holidays[d.id] = d.data(); });
+
+  // Devices
+  const devicesSnap = await getDocs(collection(db, 'devices'));
+  const devices = {};
+  devicesSnap.forEach(d => { devices[d.id] = d.data(); });
+
+  // Config (e.g. admin password hash)
+  const configSnap = await getDocs(collection(db, 'config'));
+  const config = {};
+  configSnap.forEach(d => { config[d.id] = d.data(); });
+
+  // Settings
+  const settingsSnap = await getDocs(collection(db, 'settings'));
+  const settings = {};
+  settingsSnap.forEach(d => { settings[d.id] = d.data(); });
+
   return {
     exportedAt: new Date().toISOString(),
-    version: 1,
+    version: 2,
     employees: emps,
-    attendance
+    attendance,
+    holidays,
+    devices,
+    config,
+    settings
   };
 }
 
@@ -2912,6 +2926,8 @@ window.downloadFullBackup = async function(silent = false) {
     // Download Excel
     XLSX.writeFile(wb, `ClockIt_Backup_${dateTag}.xlsx`);
 
+    localStorage.setItem(LS_LAST_BACKUP, String(Date.now()));
+    updateLastBackupUI();
     if (!silent) {
       status.textContent = `✓ Backup downloaded (${payload.employees.length} employees, ${Object.keys(payload.attendance).length} records)`;
       status.style.color = 'var(--success)';
@@ -3025,24 +3041,28 @@ async function runAutoClockOut() {
 // Poll every 60 seconds
 setInterval(runAutoClockOut, 60 * 1000);
 
-// ── Weekly auto-backup scheduler (auto-downloads on Mondays when admin opens panel) ──
-async function maybeRunWeeklyBackup() {
-  const now = new Date();
-  // Only run on Mondays (day 1)
-  if (now.getDay() !== 1) return;
-
+// ── Last backup reminder UI ──
+function updateLastBackupUI() {
+  const infoEl = $('last-backup-info');
+  if (!infoEl) return;
   const lastRun = parseInt(localStorage.getItem(LS_LAST_BACKUP) || '0');
-  const sixDaysMs = 6 * 24 * 60 * 60 * 1000;
-  if (Date.now() - lastRun < sixDaysMs) return; // already ran this week
-
-  try {
-    await window.downloadFullBackup(true); // silent=true: skip button state changes
-    localStorage.setItem(LS_LAST_BACKUP, String(Date.now()));
-    const infoEl = $('weekly-backup-info');
-    if (infoEl) infoEl.textContent = `✓ Weekly backup downloaded — ${now.toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}`;
-    console.log('[ClockIt] Weekly backup downloaded');
-  } catch(e) {
-    console.warn('[ClockIt] Weekly backup failed:', e);
+  if (!lastRun) {
+    infoEl.textContent = 'No backup taken yet — click Backup Now to create one.';
+    infoEl.style.color = 'var(--danger)';
+    return;
+  }
+  const diffMs = Date.now() - lastRun;
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const dateStr = new Date(lastRun).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  if (diffDays === 0) {
+    infoEl.textContent = `Last backup: today (${dateStr})`;
+    infoEl.style.color = 'var(--success)';
+  } else if (diffDays <= 7) {
+    infoEl.textContent = `Last backup: ${diffDays} day${diffDays > 1 ? 's' : ''} ago (${dateStr})`;
+    infoEl.style.color = 'var(--muted)';
+  } else {
+    infoEl.textContent = `⚠ Last backup: ${diffDays} days ago (${dateStr}) — consider backing up soon.`;
+    infoEl.style.color = 'var(--danger)';
   }
 }
 
