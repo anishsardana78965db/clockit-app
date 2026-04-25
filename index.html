@@ -2731,7 +2731,7 @@ window.saveManualAttendance = async function() {
 };
 
 // ── Pre-configured Firebase ──
-const EMBEDDED_CONFIG = {
+const PRODUCTION_CONFIG = {
   apiKey: "AIzaSyASxUgNv56ayeCNH9niYcSyY9TRlYsWap4",
   authDomain: "attendance-2d879.firebaseapp.com",
   projectId: "attendance-2d879",
@@ -2739,6 +2739,26 @@ const EMBEDDED_CONFIG = {
   messagingSenderId: "878446144077",
   appId: "1:878446144077:web:579f0befe06849cd5aca04"
 };
+
+// ── Staging Firebase (used on any URL that isn't the production domain) ──
+// TODO: Replace the values below with your staging Firebase project's config
+//       (from console.firebase.google.com → your staging project → Project Settings → General → Your apps)
+const STAGING_CONFIG = {
+  apiKey: "REPLACE_WITH_STAGING_API_KEY",
+  authDomain: "REPLACE_WITH_STAGING_PROJECT_ID.firebaseapp.com",
+  projectId: "REPLACE_WITH_STAGING_PROJECT_ID",
+  storageBucket: "REPLACE_WITH_STAGING_PROJECT_ID.firebasestorage.app",
+  messagingSenderId: "REPLACE_WITH_STAGING_MESSAGING_SENDER_ID",
+  appId: "REPLACE_WITH_STAGING_APP_ID"
+};
+
+// TODO: Replace the hostname below with your exact production URL (e.g. "clockit-app.pages.dev")
+//       Check your Cloudflare Pages dashboard → your project → the production deployment URL
+const PRODUCTION_HOSTNAME = "YOUR_PRODUCTION_URL.pages.dev";
+
+const EMBEDDED_CONFIG = window.location.hostname === PRODUCTION_HOSTNAME
+  ? PRODUCTION_CONFIG
+  : STAGING_CONFIG;
 
 // ── Boot ──
 async function boot() {
