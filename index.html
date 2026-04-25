@@ -1121,6 +1121,7 @@ updateClocks(); setInterval(updateClocks,10000);
 window.showScreen = function(id) {
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   $(id).classList.add('active');
+  window.scrollTo(0, 0);
 };
 
 const LS_CONFIG     = 'ci_firebase_config';
@@ -3250,4 +3251,3 @@ window.importAttendanceExcel = async function(input) {
 </script>
 </body>
 </html>
-# test
