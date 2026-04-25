@@ -2741,8 +2741,6 @@ const PRODUCTION_CONFIG = {
 };
 
 // ── Staging Firebase (used on any URL that isn't the production domain) ──
-// TODO: Replace the values below with your staging Firebase project's config
-//       (from console.firebase.google.com → your staging project → Project Settings → General → Your apps)
 const STAGING_CONFIG = {
   apiKey: "AIzaSyCcaMVGGahe87Tq7L39KYmVftP9taU-jIQ",
   authDomain: "testclockit-8283d.firebaseapp.com",
@@ -2752,9 +2750,7 @@ const STAGING_CONFIG = {
   appId: "1:659613699389:web:01f596c14a0bb568084954"
 };
 
-// TODO: Replace the hostname below with your exact production URL (e.g. "clockit-app.pages.dev")
-//       Check your Cloudflare Pages dashboard → your project → the production deployment URL
-const PRODUCTION_HOSTNAME = "https://clockit-wot.pages.dev";
+const PRODUCTION_HOSTNAME = "clockit-wot.pages.dev";
 
 const EMBEDDED_CONFIG = window.location.hostname === PRODUCTION_HOSTNAME
   ? PRODUCTION_CONFIG
