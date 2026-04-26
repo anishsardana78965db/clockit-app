@@ -763,13 +763,12 @@
   <div id="dash-salary-card" style="display:none;background:linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%);border-radius:12px;padding:14px 16px;margin-top:20px;color:#fff;">
     <div class="salary-collapsible-head" id="dash-salary-head" role="button" aria-expanded="false" tabindex="0" onclick="toggleSalaryCard()">
       <div class="salary-head-left">
-        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;opacity:0.75;margin-bottom:4px;">Expected Salary Payable</div>
-        <div id="dash-salary-val" style="font-size:22px;font-weight:700;letter-spacing:-0.5px;">₹0</div>
+        <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;opacity:0.85;">Expected Salary Payable</div>
       </div>
       <span class="chev">▾</span>
     </div>
-    <div class="salary-details" id="dash-salary-details" style="display:none;">
-      <div id="dash-salary-formula"></div>
+    <div class="salary-details" id="dash-salary-details" style="display:none;text-align:center;">
+      <div id="dash-salary-val" style="font-size:28px;font-weight:700;letter-spacing:-0.5px;opacity:1;">₹0</div>
     </div>
   </div>
 
@@ -1607,7 +1606,6 @@ async function loadDashboard(emp) {
     const paidDays = daysPresent + holidaysElapsed;
     const salaryPayable = Math.round((monthlySalary * paidDays) / 30);
     $('dash-salary-val').textContent = '₹' + salaryPayable.toLocaleString('en-IN');
-    $('dash-salary-formula').textContent = `Formula: ₹${monthlySalary.toLocaleString('en-IN')} × ${paidDays} paid days ÷ 30 = ₹${salaryPayable.toLocaleString('en-IN')}`;
     $('dash-salary-card').style.display = 'block';
     // Reset to collapsed on each render
     $('dash-salary-details').style.display = 'none';
