@@ -362,9 +362,9 @@
   }
   .cta-btn.primary:hover { background: var(--accent-dark); }
   .cta-btn.danger {
-    background: var(--danger-dim);
-    color: var(--danger);
-    border: 1px solid rgba(220,38,38,0.2);
+    background: var(--danger);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(220,38,38,0.3);
   }
   .cta-btn.ghost {
     background: var(--surface);
@@ -748,7 +748,12 @@
     </div>
   </div>
 
-  <button class="cta-btn primary" id="btn-checkin" onclick="doCheckIn()">✓ Check In</button>
+  <div id="dash-salary-card" style="display:none;background:linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%);border-radius:12px;padding:14px 16px;margin-top:12px;color:#fff;text-align:center;">
+    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;opacity:0.75;margin-bottom:4px;">Expected Salary Payable</div>
+    <div id="dash-salary-val" style="font-size:28px;font-weight:700;letter-spacing:-0.5px;">₹0</div>
+  </div>
+
+  <button class="cta-btn primary" id="btn-checkin" onclick="doCheckIn()" style="margin-top:20px;">✓ Check In</button>
   <button class="cta-btn danger" id="btn-checkout" onclick="doCheckOut()" style="display:none">Check Out</button>
 
   <div class="section-title" style="margin-top:20px">This Month</div>
@@ -889,7 +894,9 @@
     <div style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6;">
       Each device is locked to one employee. Unlock to reassign or let the employee pick again.
     </div>
+    <div id="admin-devices-dup-banner"></div>
     <div id="admin-devices-list"><div style="color:var(--muted);font-size:13px;">Loading...</div></div>
+    <button class="emp-manual-btn" style="margin-top:10px;" onclick="window.cleanupDuplicateDevices()">Cleanup duplicate devices</button>
   </div>
 
   <div class="divider"></div>
@@ -1509,11 +1516,32 @@ async function checkPin() {
     await loadDashboard(currentEmp);
     showScreen('screen-dash');
   } else {
+    // Before allowing registration on this device, ensure this employee
+    // doesn't already have another locked device elsewhere (1-device-per-employee).
+    const otherLocked = await findOtherLockedDeviceForEmp(currentEmp.id, deviceId);
+    if (otherLocked) {
+      const dn = otherLocked.deviceName || 'another device';
+      hintEl.textContent = `Already registered to "${dn}". Ask admin to unlock.`;
+      showToast(`This employee is already registered to "${dn}". Ask the admin to unlock it.`);
+      return;
+    }
     // Not yet registered — show device naming screen
     currentDeviceName = '';
     $('device-name-input').value = '';
     showScreen('screen-device-reg');
   }
+}
+
+// Returns the first device doc locked to empId on a different deviceId, or null.
+async function findOtherLockedDeviceForEmp(empId, currentDeviceId) {
+  const snap = await getDocs(collection(db, 'devices'));
+  for (const d of snap.docs) {
+    const data = d.data();
+    if (data.empId === empId && !data.unlocked && d.id !== currentDeviceId) {
+      return { id: d.id, ...data };
+    }
+  }
+  return null;
 }
 
 // ── Confirm device registration ──
@@ -1530,6 +1558,12 @@ window.confirmDeviceReg = async function() {
     lastSeen: Date.now(),
     unlocked: false
   });
+  // Enforce 1 device per employee: remove any other device docs for this employee.
+  try {
+    const snap = await getDocs(collection(db, 'devices'));
+    const stale = snap.docs.filter(d => d.id !== deviceId && d.data().empId === currentEmp.id);
+    await Promise.all(stale.map(d => deleteDoc(doc(db, 'devices', d.id))));
+  } catch (e) { console.warn('Cleanup of stale devices failed', e); }
   currentDeviceName = name;
   $('dash-device-name').textContent = name;
   showToast(`Device locked to ${currentEmp.name}`);
@@ -1554,6 +1588,13 @@ async function loadDashboard(emp) {
   $('stat-days').textContent = holidaysElapsed > 0 ? `${daysPresent}+${holidaysElapsed}` : daysPresent;
   $('stat-absent').textContent = absentDays;
   $('stat-working').textContent = workingDaysElapsed;
+  const monthlySalary = emp.monthlySalary || 0;
+  if (monthlySalary > 0) {
+    const paidDays = daysPresent + holidaysElapsed;
+    const salaryPayable = Math.round((monthlySalary * paidDays) / 30);
+    $('dash-salary-val').textContent = '₹' + salaryPayable.toLocaleString('en-IN');
+    $('dash-salary-card').style.display = 'block';
+  }
   renderCalendar(monthData, now);
 }
 
@@ -2129,6 +2170,7 @@ window.deleteEmployee = async function(id) {
 // ── Admin: Device management ──
 async function loadDeviceList() {
   const listEl = $('admin-devices-list');
+  const bannerEl = $('admin-devices-dup-banner');
   const snap = await getDocs(collection(db, 'devices'));
   const allDevices = snap.docs.map(d => ({ id: d.id, ...d.data() }))
     .filter(d => d.empId && !d.unlocked)
@@ -2141,6 +2183,13 @@ async function loadDeviceList() {
     seen.add(d.empId);
     return true;
   });
+
+  const dupCount = allDevices.length - devices.length;
+  if (bannerEl) {
+    bannerEl.innerHTML = dupCount > 0
+      ? `<div style="background:#fef3c7;border:1px solid #fbbf24;color:#92400e;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px;line-height:1.5;">⚠️ ${dupCount} duplicate device record${dupCount===1?'':'s'} detected. Click <b>Cleanup duplicate devices</b> below to remove ${dupCount===1?'it':'them'}.</div>`
+      : '';
+  }
 
   if (!devices.length) {
     listEl.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0;">No devices registered yet.</div>';
@@ -2168,6 +2217,24 @@ async function loadDeviceList() {
     listEl.appendChild(card);
   });
 }
+
+window.cleanupDuplicateDevices = async function() {
+  const snap = await getDocs(collection(db, 'devices'));
+  const all = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => d.empId);
+  const byEmp = new Map();
+  for (const d of all) {
+    const score = d.lastSeen || d.lockedAt || 0;
+    const cur = byEmp.get(d.empId);
+    if (!cur || score > cur.score) byEmp.set(d.empId, { keep: d, score });
+  }
+  const keepIds = new Set([...byEmp.values()].map(v => v.keep.id));
+  const toDelete = all.filter(d => !keepIds.has(d.id));
+  if (!toDelete.length) { showToast('No duplicate devices found'); return; }
+  if (!confirm(`Remove ${toDelete.length} duplicate device record${toDelete.length===1?'':'s'}? The most-recently-seen device per employee will be kept.`)) return;
+  await Promise.all(toDelete.map(d => deleteDoc(doc(db, 'devices', d.id))));
+  showToast(`Removed ${toDelete.length} duplicate device record${toDelete.length===1?'':'s'}`);
+  await loadDeviceList();
+};
 
 window.unlockDevice = async function(deviceId, deviceName) {
   if (!confirm(`Unlock "${deviceName}"? The employee will need to log in again on their next visit.`)) return;
