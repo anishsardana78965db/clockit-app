@@ -733,7 +733,7 @@
     <div class="date-str" id="dash-date"></div>
   </div>
 
-  <div class="time-card">
+  <div class="time-card" id="dash-today-card">
     <div class="time-card-label">Today's check-in</div>
     <div class="time-card-value muted" id="dash-checkin-val">—</div>
     <div class="time-card-sub" id="dash-checkin-sub">Not checked in yet</div>
@@ -757,7 +757,14 @@
   <button class="cta-btn primary" id="btn-checkin" onclick="doCheckIn()" style="margin-top:20px;">✓ Check In</button>
   <button class="cta-btn danger" id="btn-checkout" onclick="doCheckOut()" style="display:none">Check Out</button>
 
-  <div class="section-title" style="margin-top:20px">This Month</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:20px;margin-bottom:8px;gap:8px;">
+    <div class="section-title" style="margin:0;" id="dash-month-title">This Month</div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <button id="dash-month-prev" type="button" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:26px;height:26px;border-radius:8px;cursor:pointer;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0;">‹</button>
+      <span id="dash-month-label" style="font-size:12px;font-weight:600;color:var(--text);min-width:110px;text-align:center;">…</span>
+      <button id="dash-month-next" type="button" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:26px;height:26px;border-radius:8px;cursor:pointer;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0;">›</button>
+    </div>
+  </div>
   <div id="attendance-calendar"></div>
 
   <div id="dash-salary-card" style="display:none;background:linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%);border-radius:12px;padding:14px 16px;margin-top:20px;color:#fff;">
@@ -1114,7 +1121,29 @@ import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc, quer
 const $ = id => document.getElementById(id);
 const pad = n => String(n).padStart(2,'0');
 const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
-const monthStr = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; };
+const monthStr = (d=new Date()) => `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
+const shiftMonth = (m, delta) => {
+  const [y, mo] = m.split('-').map(Number);
+  const d = new Date(y, mo - 1 + delta, 1);
+  return monthStr(d);
+};
+const formatMonthLabel = m => {
+  const [y, mo] = m.split('-').map(Number);
+  return new Date(y, mo - 1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+};
+const joinMonthFor = emp => {
+  if (!emp?.createdAt) return monthStr();
+  return monthStr(new Date(emp.createdAt));
+};
+// Reference date used by computeMonthTotals/renderCalendarInto.
+// For the current month, use real "now"; for past months, use the last day
+// of that month so all days are treated as elapsed (no "future" gating).
+const refDateForMonth = m => {
+  const real = new Date();
+  if (m === monthStr(real)) return real;
+  const [y, mo] = m.split('-').map(Number);
+  return new Date(y, mo, 0, 23, 59, 59);
+};
 const fmtTime = ts => { const d=new Date(ts); let h=d.getHours(), m=pad(d.getMinutes()), ampm=h>=12?'PM':'AM'; h=h%12||12; return `${h}:${m} ${ampm}`; };
 const fmtDate = str => {
   const [y,m,d]=str.split('-');
@@ -1592,15 +1621,55 @@ window.confirmDeviceReg = async function() {
 };
 
 // ── Dashboard ──
-async function loadDashboard(emp) {
+let dashViewMonth = null;
+let dashCurrentEmp = null;
+async function loadDashboard(emp, month) {
+  // Reset to current month on a fresh login (when emp is passed).
+  if (emp) { dashCurrentEmp = emp; dashViewMonth = monthStr(); }
+  if (month) dashViewMonth = month;
+  if (!dashCurrentEmp) return;
+  emp = dashCurrentEmp;
+  const m = dashViewMonth;
+  const isCurrentMonth = (m === monthStr());
   const today = todayStr();
-  const month = monthStr();
   $('dash-name').textContent = emp.name;
   $('dash-date').textContent = fmtDate(today);
   todayRecord = (await getDoc(doc(db,'attendance',`${emp.id}_${today}`))).data() || null;
   renderCheckInOut();
-  const monthData = await getMonthRecords(emp.id, month);
-  const now = new Date();
+
+  // Today card + check-in/out buttons only make sense on the current month
+  const todayCard = document.getElementById('dash-today-card');
+  if (todayCard) todayCard.style.display = isCurrentMonth ? '' : 'none';
+  if (!isCurrentMonth) {
+    $('btn-checkin').style.display = 'none';
+    $('btn-checkout').style.display = 'none';
+  }
+
+  // Month stepper UI
+  const joinMonth = joinMonthFor(emp);
+  const labelEl = document.getElementById('dash-month-label');
+  if (labelEl) labelEl.textContent = formatMonthLabel(m);
+  const titleEl = document.getElementById('dash-month-title');
+  if (titleEl) titleEl.textContent = isCurrentMonth ? 'This Month' : 'Month';
+  const prevBtn = document.getElementById('dash-month-prev');
+  const nextBtn = document.getElementById('dash-month-next');
+  if (prevBtn) {
+    const dis = m <= joinMonth;
+    prevBtn.disabled = dis;
+    prevBtn.style.opacity = dis ? '0.4' : '1';
+    prevBtn.style.cursor = dis ? 'not-allowed' : 'pointer';
+    prevBtn.onclick = () => { if (dashViewMonth > joinMonth) loadDashboard(null, shiftMonth(dashViewMonth, -1)); };
+  }
+  if (nextBtn) {
+    const dis = m >= monthStr();
+    nextBtn.disabled = dis;
+    nextBtn.style.opacity = dis ? '0.4' : '1';
+    nextBtn.style.cursor = dis ? 'not-allowed' : 'pointer';
+    nextBtn.onclick = () => { if (dashViewMonth < monthStr()) loadDashboard(null, shiftMonth(dashViewMonth, 1)); };
+  }
+
+  const monthData = await getMonthRecords(emp.id, m);
+  const now = refDateForMonth(m);
   // Refresh holidays in case admin added any since last load
   await loadHolidays();
   const { workingDaysElapsed, daysPresent, holidaysElapsed, absentDays } = computeMonthTotals(monthData, now);
@@ -1609,7 +1678,8 @@ async function loadDashboard(emp) {
   $('stat-absent').textContent = absentDays;
   $('stat-working').textContent = workingDaysElapsed;
   const monthlySalary = emp.monthlySalary || 0;
-  if (monthlySalary > 0) {
+  // Salary card — current month only
+  if (monthlySalary > 0 && isCurrentMonth) {
     const paidDays = daysPresent + holidaysElapsed;
     const salaryPayable = Math.round((monthlySalary * paidDays) / 30);
     $('dash-salary-val').textContent = '₹' + salaryPayable.toLocaleString('en-IN');
@@ -1819,11 +1889,13 @@ function renderCalendarInto(cal, monthData, now, adminMode) {
 }
 
 async function getMonthRecords(empId, month) {
-  // Fetch only the days of this month for this employee using known doc IDs
+  // Fetch the days of `month` (YYYY-MM) for this employee using known doc IDs.
+  // For the current month, clip at today; for past months, fetch all days.
+  const [y, m] = month.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
   const now = new Date();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
-  const today = now.getDate();
-  const limit = Math.min(daysInMonth, today);
+  const isCurrent = (y === now.getFullYear() && m === now.getMonth()+1);
+  const limit = isCurrent ? Math.min(daysInMonth, now.getDate()) : daysInMonth;
 
   const fetches = [];
   for (let d = 1; d <= limit; d++) {
@@ -2424,22 +2496,41 @@ window.viewEmpAttendance = async function(empId, empName) {
   panel.style.display = 'block';
   panel.style.cssText = 'display:block;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-top:6px;box-shadow:var(--shadow-md);';
   panel.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-      <div style="font-size:13px;font-weight:600;color:var(--text);">${empName} — ${new Date().toLocaleString('en-IN',{month:'long',year:'numeric'})}</div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:8px;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;color:var(--text);">${empName}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+          <button id="admin-month-prev" type="button" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:26px;height:26px;border-radius:8px;cursor:pointer;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0;">‹</button>
+          <span id="admin-month-label" style="font-size:12px;font-weight:600;color:var(--text);min-width:120px;text-align:center;">…</span>
+          <button id="admin-month-next" type="button" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:26px;height:26px;border-radius:8px;cursor:pointer;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0;">›</button>
+        </div>
+      </div>
       <button class="back-btn" onclick="closeAdminView()" style="font-size:12px;padding:5px 10px;">✕ Close</button>
     </div>
     <div id="admin-attendance-content" style="color:var(--muted);font-size:13px;padding:4px 0;">Loading...</div>
   `;
   panel.scrollIntoView({behavior:'smooth', block:'nearest'});
 
-  const month = monthStr();
-  const now = new Date();
   // Refresh holidays so any just-added entries are reflected here
   await loadHolidays();
-  // Fetch employee doc for salary
+  // Fetch employee doc for salary + join date
   const empDoc = await getDoc(doc(db,'employees',empId));
   const empData = empDoc.exists() ? empDoc.data() : {};
   const monthlySalary = empData.monthlySalary || 0;
+  const joinMonth = joinMonthFor(empData);
+  let adminViewMonth = monthStr();
+
+  async function renderForMonth(m) {
+   adminViewMonth = m;
+   const labelEl = document.getElementById('admin-month-label');
+   if (labelEl) labelEl.textContent = formatMonthLabel(m);
+   const prevBtn = document.getElementById('admin-month-prev');
+   const nextBtn = document.getElementById('admin-month-next');
+   if (prevBtn) { const dis = m <= joinMonth; prevBtn.disabled = dis; prevBtn.style.opacity = dis ? '0.4' : '1'; prevBtn.style.cursor = dis ? 'not-allowed' : 'pointer'; }
+   if (nextBtn) { const dis = m >= monthStr(); nextBtn.disabled = dis; nextBtn.style.opacity = dis ? '0.4' : '1'; nextBtn.style.cursor = dis ? 'not-allowed' : 'pointer'; }
+   const month = m;
+   const now = refDateForMonth(m);
+   const isCurrentMonth = (m === monthStr());
 
   const monthData = await getMonthRecords(empId, month);
   const { workingDaysElapsed, daysPresent, holidaysElapsed, paidDays, absentDays } = computeMonthTotals(monthData, now);
@@ -2477,8 +2568,8 @@ window.viewEmpAttendance = async function(empId, empName) {
   summary.innerHTML = presentCard + holidayCard + absentCard + workingCard;
   container.appendChild(summary);
 
-  // Salary card
-  if (monthlySalary > 0) {
+  // Salary card — current month only
+  if (monthlySalary > 0 && isCurrentMonth) {
     const salaryCard = document.createElement('div');
     salaryCard.style.cssText = 'background:linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%);border-radius:12px;padding:14px 16px;margin-bottom:16px;color:#fff;';
     const breakdownLine = holidaysElapsed > 0
@@ -2644,6 +2735,17 @@ window.viewEmpAttendance = async function(empId, empName) {
       container.appendChild(row);
     });
   }
+  } // end renderForMonth
+
+  document.getElementById('admin-month-prev').onclick = () => {
+    if (adminViewMonth <= joinMonth) return;
+    renderForMonth(shiftMonth(adminViewMonth, -1));
+  };
+  document.getElementById('admin-month-next').onclick = () => {
+    if (adminViewMonth >= monthStr()) return;
+    renderForMonth(shiftMonth(adminViewMonth, 1));
+  };
+  await renderForMonth(adminViewMonth);
 };
 
 window.closeAdminView = function() {
