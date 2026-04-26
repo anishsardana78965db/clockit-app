@@ -446,6 +446,12 @@
   }
   .salary-prefix .text-input { padding-left: 28px; }
 
+  .salary-collapsible-head { display:flex; align-items:center; justify-content:space-between; cursor:pointer; gap:12px; }
+  .salary-collapsible-head .salary-head-left { text-align:left; }
+  .salary-collapsible-head .chev { transition: transform 0.2s ease; opacity:0.85; font-size:14px; }
+  .salary-collapsible-head.open .chev { transform: rotate(180deg); }
+  .salary-details { margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.18); font-size:12px; line-height:1.5; opacity:0.9; text-align:left; }
+
   .emp-admin-card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -748,16 +754,24 @@
     </div>
   </div>
 
-  <div id="dash-salary-card" style="display:none;background:linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%);border-radius:12px;padding:14px 16px;margin-top:12px;color:#fff;text-align:center;">
-    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;opacity:0.75;margin-bottom:4px;">Expected Salary Payable</div>
-    <div id="dash-salary-val" style="font-size:28px;font-weight:700;letter-spacing:-0.5px;">₹0</div>
-  </div>
-
   <button class="cta-btn primary" id="btn-checkin" onclick="doCheckIn()" style="margin-top:20px;">✓ Check In</button>
   <button class="cta-btn danger" id="btn-checkout" onclick="doCheckOut()" style="display:none">Check Out</button>
 
   <div class="section-title" style="margin-top:20px">This Month</div>
   <div id="attendance-calendar"></div>
+
+  <div id="dash-salary-card" style="display:none;background:linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%);border-radius:12px;padding:14px 16px;margin-top:20px;color:#fff;">
+    <div class="salary-collapsible-head" id="dash-salary-head" role="button" aria-expanded="false" tabindex="0" onclick="toggleSalaryCard()">
+      <div class="salary-head-left">
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;opacity:0.75;margin-bottom:4px;">Expected Salary Payable</div>
+        <div id="dash-salary-val" style="font-size:22px;font-weight:700;letter-spacing:-0.5px;">₹0</div>
+      </div>
+      <span class="chev">▾</span>
+    </div>
+    <div class="salary-details" id="dash-salary-details" style="display:none;">
+      <div id="dash-salary-formula"></div>
+    </div>
+  </div>
 
   <button class="cta-btn ghost" onclick="openEmpPinModal()" style="margin-top:20px;font-size:13px;">🔑 Change My PIN</button>
 </div>
@@ -1593,10 +1607,26 @@ async function loadDashboard(emp) {
     const paidDays = daysPresent + holidaysElapsed;
     const salaryPayable = Math.round((monthlySalary * paidDays) / 30);
     $('dash-salary-val').textContent = '₹' + salaryPayable.toLocaleString('en-IN');
+    $('dash-salary-formula').textContent = `Formula: ₹${monthlySalary.toLocaleString('en-IN')} × ${paidDays} paid days ÷ 30 = ₹${salaryPayable.toLocaleString('en-IN')}`;
     $('dash-salary-card').style.display = 'block';
+    // Reset to collapsed on each render
+    $('dash-salary-details').style.display = 'none';
+    $('dash-salary-head').classList.remove('open');
+    $('dash-salary-head').setAttribute('aria-expanded', 'false');
+  } else {
+    $('dash-salary-card').style.display = 'none';
   }
   renderCalendar(monthData, now);
 }
+
+window.toggleSalaryCard = function() {
+  const head = $('dash-salary-head');
+  const details = $('dash-salary-details');
+  if (!head || !details) return;
+  const isOpen = head.classList.toggle('open');
+  details.style.display = isOpen ? 'block' : 'none';
+  head.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+};
 
 function renderCheckInOut() {
   const rec = todayRecord;
