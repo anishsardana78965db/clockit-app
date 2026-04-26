@@ -101,6 +101,16 @@ service cloud.firestore {
       );
     }
 
+    // ─── Geofence anomalies (passive review queue for suspicious check-ins) ───
+    match /geofenceAnomalies/{docId} {
+      allow read: if true;
+      allow create: if request.resource.data.employeeId is string
+                 && request.resource.data.date is string
+                 && request.resource.data.tags is list;
+      // append-only / dismiss-only — no updates
+      allow delete: if true;
+    }
+
     // Catch-all: deny everything else
     match /{document=**} {
       allow read, write: if false;

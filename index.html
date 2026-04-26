@@ -999,6 +999,13 @@
     </div>
   </div>
 
+  <!-- Geofence anomalies — passive review of suspicious check-ins -->
+  <div class="admin-section" id="geofence-anomalies-section">
+    <div class="section-title" style="margin-bottom:2px;">🚨 Geofence anomalies</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Suspicious check-ins from the last 30 days. Review and dismiss false-positives.</div>
+    <div id="geofence-anomalies-list" style="font-size:13px;color:var(--muted);">Loading…</div>
+  </div>
+
   <div class="admin-section" id="admin-attendance-section" style="display:none">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
       <div class="section-title" style="margin-bottom:0" id="admin-view-title">Attendance</div>
@@ -1100,7 +1107,7 @@
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc }
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc, query, where, orderBy, limit }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 // ── helpers ──
@@ -1876,17 +1883,79 @@ function getLocation() {
   });
 }
 
+// ── Mock-location anomaly heuristics ──
+// Passive review only — never blocks check-in. A determined spoofer can defeat
+// every individual heuristic; this catches the casual case (free spoof apps in
+// default settings).
+async function fetchPrevAttendanceForAnomaly(empId, todayDate) {
+  try {
+    const q = query(
+      collection(db, 'attendance'),
+      where('employeeId', '==', empId),
+      orderBy('date', 'desc'),
+      limit(4) // up to 3 prior records (skip today if it's already there)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => d.data()).filter(r => r.date !== todayDate).slice(0, 3);
+  } catch(e) {
+    console.warn('[ClockIt] anomaly lookback failed:', e);
+    return [];
+  }
+}
+
+function scoreGeofenceAnomalies({ lat, lng, accuracyM, distanceM }, prevRecords) {
+  const tags = [];
+
+  // round-accuracy: spoofers default to integer round numbers; real GPS jitters
+  if ([5, 10, 15, 20, 25].includes(accuracyM)) tags.push('round-accuracy');
+
+  // unrealistic-accuracy: consumer GPS rarely beats 3m
+  if (accuracyM != null && accuracyM < 3) tags.push('unrealistic-accuracy');
+
+  // identical-coords: lat AND lng match a previous day to 6 decimal places
+  const lat6 = lat.toFixed(6), lng6 = lng.toFixed(6);
+  for (const prev of prevRecords) {
+    if (prev.checkInLat == null || prev.checkInLng == null) continue;
+    if (prev.checkInLat.toFixed(6) === lat6 && prev.checkInLng.toFixed(6) === lng6) {
+      tags.push('identical-coords');
+      break;
+    }
+  }
+
+  // impossible-travel: > 200 km/h between yesterday's last known location and today's check-in
+  for (const prev of prevRecords) {
+    const prevLat = prev.checkOutLat ?? prev.checkInLat;
+    const prevLng = prev.checkOutLng ?? prev.checkInLng;
+    const prevTs  = prev.checkOut ?? prev.checkIn;
+    if (prevLat == null || prevLng == null || prevTs == null) continue;
+    const distKm  = haversineDistance(lat, lng, prevLat, prevLng) / 1000;
+    const hours   = (Date.now() - prevTs) / 3_600_000;
+    if (hours > 0 && distKm / hours > 200) { tags.push('impossible-travel'); break; }
+  }
+
+  // accuracy-distance-mismatch: claims to be deep inside fence with huge uncertainty
+  // e.g. radius=50, distance=5, accuracy=200 → the "5m from centre" is a coincidence
+  if (accuracyM != null && distanceM != null
+      && accuracyM > STORE_RADIUS_M * 2
+      && distanceM < STORE_RADIUS_M / 2) {
+    tags.push('accuracy-distance-mismatch');
+  }
+
+  return tags;
+}
+
 // ── Check In / Out ──
 window.doCheckIn = async function() {
   const btn = $('btn-checkin');
   btn.disabled = true;
   btn.textContent = '📍 Getting location...';
 
-  let lat = null, lng = null, distanceM = null;
+  let lat = null, lng = null, distanceM = null, accuracyM = null;
   try {
     const pos = await getLocation();
     lat = pos.coords.latitude;
     lng = pos.coords.longitude;
+    accuracyM = pos.coords.accuracy != null ? Math.round(pos.coords.accuracy) : null;
     distanceM = Math.round(haversineDistance(lat, lng, STORE_LAT, STORE_LNG));
 
     if (distanceM > STORE_RADIUS_M) {
@@ -1907,9 +1976,36 @@ window.doCheckIn = async function() {
   const ref = doc(db,'attendance',`${currentEmp.id}_${today}`);
   const now = Date.now();
   const data = { checkIn: now, employeeId: currentEmp.id, date: today };
-  if (lat !== null) { data.checkInLat = lat; data.checkInLng = lng; data.checkInDistanceM = distanceM; }
+  if (lat !== null) {
+    data.checkInLat = lat;
+    data.checkInLng = lng;
+    data.checkInDistanceM = distanceM;
+    if (accuracyM != null) data.checkInAccuracyM = accuracyM;
+  }
   await setDoc(ref, data, { merge: true });
-  todayRecord = { checkIn: now, checkInLat: lat, checkInLng: lng, checkInDistanceM: distanceM };
+  todayRecord = { checkIn: now, checkInLat: lat, checkInLng: lng, checkInDistanceM: distanceM, checkInAccuracyM: accuracyM };
+
+  // Fire-and-forget anomaly scoring — must NOT block the user.
+  (async () => {
+    try {
+      const prev = await fetchPrevAttendanceForAnomaly(currentEmp.id, today);
+      const tags = scoreGeofenceAnomalies({ lat, lng, accuracyM, distanceM }, prev);
+      if (tags.length > 0) {
+        await setDoc(doc(db, 'geofenceAnomalies', `${currentEmp.id}_${today}`), {
+          employeeId: currentEmp.id,
+          employeeName: currentEmp.name || '',
+          date: today,
+          tags,
+          lat, lng,
+          accuracyM,
+          distanceM,
+          createdAt: now
+        });
+      }
+    } catch(e) {
+      console.warn('[ClockIt] anomaly write failed:', e);
+    }
+  })();
   renderCheckInOut();
   showToast(`Checked in at ${fmtTime(now)}`);
   await loadDashboard(currentEmp);
@@ -2125,6 +2221,7 @@ async function loadAdminPanel() {
   $('cfg-store-lng').value = STORE_LNG;
   $('cfg-store-radius').value = STORE_RADIUS_M;
   updateGeofenceLockedDisplay();
+  loadGeofenceAnomalies();
   // Holidays — refresh from Firestore and populate list
   await loadHolidays();
   renderHolidaysList();
@@ -2663,6 +2760,69 @@ window.saveSettings = async function() {
     showToast('Settings saved');
   }
   $('cfg-admin-pin').value='';
+};
+
+// ── Geofence anomalies — admin review queue ──
+const ANOMALY_TAG_LABELS = {
+  'round-accuracy': 'Round accuracy',
+  'unrealistic-accuracy': 'Unrealistic accuracy',
+  'identical-coords': 'Identical coords',
+  'impossible-travel': 'Impossible travel',
+  'accuracy-distance-mismatch': 'Accuracy/distance mismatch'
+};
+
+async function loadGeofenceAnomalies() {
+  const listEl = $('geofence-anomalies-list');
+  if (!listEl) return;
+  try {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const q = query(
+      collection(db, 'geofenceAnomalies'),
+      orderBy('createdAt', 'desc'),
+      limit(100)
+    );
+    const snap = await getDocs(q);
+    const rows = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(r => (r.createdAt ?? 0) >= cutoff);
+
+    if (rows.length === 0) {
+      listEl.innerHTML = '<div style="padding:10px 12px;background:var(--surface2);border-radius:8px;color:var(--muted);">No anomalies detected. ✓</div>';
+      return;
+    }
+
+    listEl.innerHTML = rows.map(r => {
+      const name = r.employeeName || r.employeeId || 'Unknown';
+      const chips = (r.tags || []).map(t =>
+        `<span style="display:inline-block;padding:2px 8px;background:rgba(220,38,38,0.1);color:#dc2626;border-radius:6px;font-size:11px;font-weight:600;margin-right:4px;">${ANOMALY_TAG_LABELS[t] || t}</span>`
+      ).join('');
+      const detail = `±${r.accuracyM ?? '?'}m · ${r.distanceM ?? '?'}m from fence`;
+      const safeId = r.id.replace(/'/g, "\\'");
+      return `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:600;color:var(--ink);">${name} · ${r.date}</div>
+            <div style="margin-top:4px;">${chips}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">${detail}</div>
+          </div>
+          <button class="cta-btn ghost" style="margin-bottom:0;padding:6px 12px;font-size:12px;" onclick="window.dismissGeofenceAnomaly('${safeId}')">Dismiss</button>
+        </div>
+      `;
+    }).join('');
+  } catch(e) {
+    console.warn('[ClockIt] failed to load anomalies:', e);
+    listEl.innerHTML = '<div style="color:var(--danger);">Failed to load anomalies.</div>';
+  }
+}
+
+window.dismissGeofenceAnomaly = async function(id) {
+  try {
+    await deleteDoc(doc(db, 'geofenceAnomalies', id));
+    showToast('Anomaly dismissed');
+    loadGeofenceAnomalies();
+  } catch(e) {
+    showToast('Failed to dismiss: ' + e.message);
+  }
 };
 
 // ── Store geofence — toggle/locked display helpers ──
