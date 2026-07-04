@@ -10,7 +10,10 @@
 > this design (data model, absent semantics, message format, app-side changes,
 > FCM delivery) is unchanged; only the code that runs at 11:00 AM / 7:30 PM now
 > lives on Cloudflare. The audit also found auto-clockout had been dead since
-> 2026-05-01 (its scheduler lived in a deleted repo), so the Worker restores it.
+> 2026-05-01; Kartik confirmed he disabled it on purpose and doesn't want it,
+> so the Worker runs ONLY the 11 AM report (auto-clockout code and the old
+> scripts/auto-clockout.js were removed; the timezone-fix section below is
+> historical).
 
 ## Requirement
 

@@ -12,10 +12,10 @@ main = "worker.js"
 compatibility_date = "2026-07-01"
 
 [triggers]
-crons = ["30 5 * * *", "0 14 * * *"] # 11:00 AM and 7:30 PM IST, in UTC
+crons = ["30 5 * * *"] # 11:00 AM IST, in UTC
 
 [env.production]
 name = "clockit-jobs"
 
 [env.production.triggers]
-crons = ["30 5 * * *", "0 14 * * *"]
+crons = ["30 5 * * *"]

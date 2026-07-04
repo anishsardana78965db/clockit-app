@@ -6,9 +6,9 @@
 // Its project_id decides which Firestore/FCM project this worker talks to,
 // so the same code serves staging and production via wrangler environments.
 //
-// Jobs (crons are UTC; IST has no DST so these never shift):
-//   "30 5 * * *"  = 11:00 AM IST — daily attendance report + absent marks
-//   "0 14 * * *"  = 7:30 PM IST — auto clock-out for forgotten checkouts
+// Job (cron is UTC; IST has no DST so this never shifts):
+//   "30 5 * * *" = 11:00 AM IST — daily attendance report + absent marks
+// (Auto clock-out deliberately removed 2026-07-05 — Kartik doesn't want it.)
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
@@ -188,39 +188,14 @@ async function dailyReport(env) {
   return `[dailyReport] ${today} in=${checkedIn.length} absent=${absent.length} → ${results.join(" | ") || "no recipients configured"}`;
 }
 
-async function autoClockOut(env) {
-  const sa = JSON.parse(env.SERVICE_ACCOUNT);
-  const pid = sa.project_id;
-  const tok = await getAccessToken(sa);
-  const today = istTodayStr();
-  const clockOutTs = new Date(`${today}T19:30:00+05:30`).getTime();
-
-  const employees = await listEmployees(pid, tok);
-  let count = 0;
-  for (const emp of employees) {
-    const att = await fsGetDoc(pid, tok, `attendance/${emp.id}_${today}`);
-    if (att && att.checkIn && !att.checkOut) {
-      await fsMerge(pid, tok, `attendance/${emp.id}_${today}`, {
-        checkOut: clockOutTs,
-        autoClockOut: true,
-        employeeId: emp.id,
-        date: today,
-      });
-      count++;
-    }
-  }
-  return `[autoClockOut] ${today} clocked out ${count} employee(s)`;
-}
-
 // ── Entry points ──
 
 export default {
   async scheduled(event, env, ctx) {
-    const out = event.cron === "30 5 * * *" ? await dailyReport(env) : await autoClockOut(env);
-    console.log(out);
+    console.log(await dailyReport(env));
   },
 
-  // Manual trigger for testing: /run/daily?key=… or /run/clockout?key=…
+  // Manual trigger for testing: /run/daily?key=…
   // (key must match the TRIGGER_KEY secret)
   async fetch(req, env) {
     const url = new URL(req.url);
@@ -228,7 +203,6 @@ export default {
       return new Response("forbidden", { status: 403 });
     }
     if (url.pathname === "/run/daily") return new Response(await dailyReport(env));
-    if (url.pathname === "/run/clockout") return new Response(await autoClockOut(env));
     return new Response("not found", { status: 404 });
   },
 };
