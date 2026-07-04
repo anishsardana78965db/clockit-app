@@ -1423,12 +1423,20 @@ async function registerDailyReportPush(emp) {
     if (!emp?.dailyReport || !('serviceWorker' in navigator) || !('Notification' in window)) return;
     if (!VAPID_KEY) { console.warn('[ClockIt] dailyReport is on but VAPID key is missing — push disabled.'); return; }
     if (await Notification.requestPermission() !== 'granted') return;
+    if (registerDailyReportPush._done) return;
     const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-    const { getMessaging, getToken } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js');
-    const token = await getToken(getMessaging(), { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
+    const { getMessaging, getToken, onMessage } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js');
+    const messaging = getMessaging();
+    const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
     if (token && token !== emp.fcmToken) {
       await setDoc(doc(db, 'employees', emp.id), { fcmToken: token, fcmTokenAt: Date.now() }, { merge: true });
     }
+    // Background pushes are displayed by the service worker; this covers the
+    // case where the app is open on screen when the report arrives.
+    onMessage(messaging, (p) => {
+      if (p.notification) swReg.showNotification(p.notification.title, { body: p.notification.body });
+    });
+    registerDailyReportPush._done = true;
   } catch(e) {
     console.warn('[ClockIt] push registration failed:', e);
   }
@@ -3149,7 +3157,7 @@ const EMBEDDED_CONFIG = window.location.hostname === PRODUCTION_HOSTNAME
 // From Firebase Console → Project settings → Cloud Messaging → Web Push
 // certificates ("Key pair"). One per project. While a key is empty, push
 // registration is silently skipped on that environment.
-const PRODUCTION_VAPID_KEY = "";
+const PRODUCTION_VAPID_KEY = "BA_luwg7lZTWBcLq1iES4lPLd3nf1A0LwEWQHRFh6d9k4aRv10JrAgoYrDU7drI1UWLdmlKCaukOCas0phxt8mE";
 const STAGING_VAPID_KEY = "BM707sPg_beh6AqLdZMHaD_5VwjM-jW5W1E2faw1an_nnvrzXeiIbCMYnivgKoAkdalxQLEePLoKIV-D8DluFDw";
 const VAPID_KEY = window.location.hostname === PRODUCTION_HOSTNAME
   ? PRODUCTION_VAPID_KEY
