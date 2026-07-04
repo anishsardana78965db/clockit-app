@@ -1,0 +1,21 @@
+# ClockIt scheduled jobs. Default deploy = staging (testclockit-8283d),
+# `wrangler deploy --env production` = production (attendance-2d879).
+# Which Firebase project each worker talks to is decided by its
+# SERVICE_ACCOUNT secret, not by anything in this file.
+#
+# Secrets per environment (set with `wrangler secret put <NAME> [--env production]`):
+#   SERVICE_ACCOUNT — the Firebase service-account JSON (entire file contents)
+#   TRIGGER_KEY     — random string guarding the manual /run/* test URLs
+
+name = "clockit-jobs-staging"
+main = "worker.js"
+compatibility_date = "2026-07-01"
+
+[triggers]
+crons = ["30 5 * * *", "0 14 * * *"] # 11:00 AM and 7:30 PM IST, in UTC
+
+[env.production]
+name = "clockit-jobs"
+
+[env.production.triggers]
+crons = ["30 5 * * *", "0 14 * * *"]

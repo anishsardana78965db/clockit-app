@@ -3,6 +3,15 @@
 **Date:** 2026-07-05
 **Status:** Approved by Kartik (chat, 2026-07-05)
 
+> **Update (same day):** the scheduler moved from Firebase Cloud Functions to a
+> **Cloudflare Worker** (`worker/`) with cron triggers — both Firebase projects
+> are on the Spark plan, which cannot run Cloud Functions, and Kartik chose not
+> to upgrade to Blaze. The `functions/` folder was removed. Everything else in
+> this design (data model, absent semantics, message format, app-side changes,
+> FCM delivery) is unchanged; only the code that runs at 11:00 AM / 7:30 PM now
+> lives on Cloudflare. The audit also found auto-clockout had been dead since
+> 2026-05-01 (its scheduler lived in a deleted repo), so the Worker restores it.
+
 ## Requirement
 
 Every day at **11:00 AM IST**, send a push notification to Kartik's and
