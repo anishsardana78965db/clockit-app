@@ -1415,6 +1415,25 @@ async function initFirebase(cfg) {
   return true;
 }
 
+// ── Daily-report push registration ──
+// Only employees flagged dailyReport (admin toggle) are ever asked for
+// notification permission. Fire-and-forget: must never block login.
+async function registerDailyReportPush(emp) {
+  try {
+    if (!emp?.dailyReport || !('serviceWorker' in navigator) || !('Notification' in window)) return;
+    if (!VAPID_KEY) { console.warn('[ClockIt] dailyReport is on but VAPID key is missing — push disabled.'); return; }
+    if (await Notification.requestPermission() !== 'granted') return;
+    const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    const { getMessaging, getToken } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js');
+    const token = await getToken(getMessaging(), { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
+    if (token && token !== emp.fcmToken) {
+      await setDoc(doc(db, 'employees', emp.id), { fcmToken: token, fcmTokenAt: Date.now() }, { merge: true });
+    }
+  } catch(e) {
+    console.warn('[ClockIt] push registration failed:', e);
+  }
+}
+
 // ── Config screen ──
 window.saveConfig = async function() {
   const cfg = {
@@ -1625,7 +1644,7 @@ let dashViewMonth = null;
 let dashCurrentEmp = null;
 async function loadDashboard(emp, month) {
   // Reset to current month on a fresh login (when emp is passed).
-  if (emp) { dashCurrentEmp = emp; dashViewMonth = monthStr(); }
+  if (emp) { dashCurrentEmp = emp; dashViewMonth = monthStr(); registerDailyReportPush(emp); }
   if (month) dashViewMonth = month;
   if (!dashCurrentEmp) return;
   emp = dashCurrentEmp;
@@ -2047,7 +2066,8 @@ window.doCheckIn = async function() {
   const today = todayStr();
   const ref = doc(db,'attendance',`${currentEmp.id}_${today}`);
   const now = Date.now();
-  const data = { checkIn: now, employeeId: currentEmp.id, date: today };
+  // absent:false clears the 11 AM auto-absent mark on a late check-in
+  const data = { checkIn: now, employeeId: currentEmp.id, date: today, absent: false };
   if (lat !== null) {
     data.checkInLat = lat;
     data.checkInLng = lng;
@@ -2325,6 +2345,9 @@ async function loadAdminPanel() {
           <button class="emp-manual-btn" onclick="openPinResetModal('${emp.id}','${emp.name}')">Reset PIN</button>
           <button class="emp-delete-btn" onclick="deleteEmployee('${emp.id}')">Remove</button>
         </div>
+        <div style="display:flex;gap:6px;">
+          <button class="emp-manual-btn" onclick="toggleDailyReport('${emp.id}', ${emp.dailyReport === true})">${emp.dailyReport === true ? '🔔 Daily report: ON' : '🔕 Daily report: OFF'}</button>
+        </div>
       </div>
     `;
     list.appendChild(card);
@@ -2335,6 +2358,14 @@ async function loadAdminPanel() {
     list.appendChild(panel);
   });
 }
+
+window.toggleDailyReport = async function(empId, current) {
+  await setDoc(doc(db, 'employees', empId), { dailyReport: !current }, { merge: true });
+  showToast(!current
+    ? 'Daily 11 AM report enabled — have them open the app once and allow notifications.'
+    : 'Daily report disabled', 4000);
+  await loadAdminPanel();
+};
 
 window.addEmployee = async function() {
   const name = $('new-emp-name').value.trim();
@@ -3113,6 +3144,16 @@ const PRODUCTION_HOSTNAME = "clockit-wot.pages.dev";
 const EMBEDDED_CONFIG = window.location.hostname === PRODUCTION_HOSTNAME
   ? PRODUCTION_CONFIG
   : STAGING_CONFIG;
+
+// ── Web-push (VAPID) public keys ──
+// From Firebase Console → Project settings → Cloud Messaging → Web Push
+// certificates ("Key pair"). One per project. While a key is empty, push
+// registration is silently skipped on that environment.
+const PRODUCTION_VAPID_KEY = "";
+const STAGING_VAPID_KEY = "";
+const VAPID_KEY = window.location.hostname === PRODUCTION_HOSTNAME
+  ? PRODUCTION_VAPID_KEY
+  : STAGING_VAPID_KEY;
 
 // ── Boot ──
 async function boot() {
