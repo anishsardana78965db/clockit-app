@@ -1949,6 +1949,10 @@ let STORE_LAT  = DEFAULT_STORE_LAT;
 let STORE_LNG  = DEFAULT_STORE_LNG;
 let STORE_RADIUS_M = DEFAULT_STORE_RADIUS_M;
 
+// Anomaly queue display threshold — events at or under this distance are
+// recorded but hidden from the admin review list.
+const ANOMALY_SHOW_MIN_DIST_M = 80;
+
 async function loadStoreSettings() {
   if (!db) return;
   try {
@@ -2117,11 +2121,12 @@ window.doCheckOut = async function() {
   btn.textContent = '📍 Getting location...';
 
   // Soft geofence check — never block checkout, just log location + flags.
-  let lat = null, lng = null, distanceM = null, outsideFence = false, gpsUnavailable = false;
+  let lat = null, lng = null, distanceM = null, accuracyM = null, outsideFence = false, gpsUnavailable = false;
   try {
     const pos = await getLocation();
     lat = pos.coords.latitude;
     lng = pos.coords.longitude;
+    accuracyM = pos.coords.accuracy != null ? Math.round(pos.coords.accuracy) : null;
     distanceM = Math.round(haversineDistance(lat, lng, STORE_LAT, STORE_LNG));
     outsideFence = distanceM > STORE_RADIUS_M;
   } catch(e) {
@@ -2142,6 +2147,27 @@ window.doCheckOut = async function() {
 
   await setDoc(ref, update, { merge: true });
   todayRecord = { ...todayRecord, ...update };
+
+  // Off-site checkout beyond the display threshold goes to the admin anomaly
+  // queue. Fire-and-forget — must never block or slow down checkout.
+  if (distanceM != null && distanceM > ANOMALY_SHOW_MIN_DIST_M) {
+    (async () => {
+      try {
+        await setDoc(doc(db, 'geofenceAnomalies', `${currentEmp.id}_${today}_out`), {
+          employeeId: currentEmp.id,
+          employeeName: currentEmp.name || '',
+          date: today,
+          tags: ['off-site-checkout'],
+          lat, lng,
+          accuracyM,
+          distanceM,
+          createdAt: now
+        });
+      } catch(e) {
+        console.warn('[ClockIt] off-site checkout anomaly write failed:', e);
+      }
+    })();
+  }
   renderCheckInOut();
 
   // User-facing toast — warn if off-site but still allow checkout
@@ -2909,7 +2935,8 @@ const ANOMALY_TAG_LABELS = {
   'unrealistic-accuracy': 'Unrealistic accuracy',
   'identical-coords': 'Identical coords',
   'impossible-travel': 'Impossible travel',
-  'accuracy-distance-mismatch': 'Accuracy/distance mismatch'
+  'accuracy-distance-mismatch': 'Accuracy/distance mismatch',
+  'off-site-checkout': 'Off-site checkout'
 };
 
 async function loadGeofenceAnomalies() {
@@ -2925,7 +2952,8 @@ async function loadGeofenceAnomalies() {
     const snap = await getDocs(q);
     const rows = snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
-      .filter(r => (r.createdAt ?? 0) >= cutoff);
+      .filter(r => (r.createdAt ?? 0) >= cutoff)
+      .filter(r => r.distanceM == null || r.distanceM > ANOMALY_SHOW_MIN_DIST_M);
 
     if (rows.length === 0) {
       listEl.innerHTML = '<div style="padding:10px 12px;background:var(--surface2);border-radius:8px;color:var(--muted);">No anomalies detected. ✓</div>';
