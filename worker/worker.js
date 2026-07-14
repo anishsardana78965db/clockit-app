@@ -129,7 +129,13 @@ async function sendPush(pid, tok, deviceToken, title, body) {
       message: {
         token: deviceToken,
         notification: { title, body },
-        webpush: { fcm_options: { link: "/" } },
+        webpush: {
+          // Urgency: Android defers normal-priority pushes while dozing —
+          // this is what made 11 AM reports arrive at 2-4 PM.
+          // TTL: undeliverable within 2h → drop, don't deliver stale.
+          headers: { Urgency: "high", TTL: "7200" },
+          fcm_options: { link: "/" },
+        },
       },
     }),
   });
@@ -171,7 +177,8 @@ async function dailyReport(env) {
   const dayLabel = new Date().toLocaleDateString("en-IN", {
     timeZone: "Asia/Kolkata", day: "2-digit", month: "short",
   });
-  const title = `ClockIt — Attendance ${dayLabel}`;
+  // Generation time in the title makes any future delivery delay self-evident.
+  const title = `ClockIt — Attendance ${dayLabel} · ${fmtIst(Date.now())}`;
   const body = `✅ ${checkedIn.length} checked in · ❌ ${absent.length} absent\n${lines.join("\n")}`;
 
   const recipients = employees.filter((e) => e.dailyReport === true && e.fcmToken);
