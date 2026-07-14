@@ -9,6 +9,9 @@
 <meta name="apple-mobile-web-app-title" content="ClockIt"/>
 <link rel="manifest" href="manifest.json"/>
 <title>ClockIt</title>
+<!-- Open TLS connections to Firebase hosts while the page is still parsing -->
+<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin/>
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
   :root {
@@ -1184,6 +1187,7 @@ const LS_CONFIG     = 'ci_firebase_config';
 const LS_SETTINGS   = 'ci_settings';
 const LS_DEVICE_EMP = 'ci_device_emp'; // legacy — kept for migration
 const LS_DEVICE_ID  = 'ci_device_id';  // permanent device fingerprint UUID
+const LS_EMP_CACHE  = 'ci_emp_cache';  // display-only employee list for instant boot render
 
 function getOrCreateDeviceId() {
   let id = localStorage.getItem(LS_DEVICE_ID);
@@ -1466,10 +1470,10 @@ window.saveConfig = async function() {
 };
 
 // ── Employee list ──
-async function loadSelectScreen() {
+async function loadSelectScreen(preloaded) {
   const today = todayStr();
   $('select-date-str').textContent = fmtDate(today);
-  employees = await fetchEmployees();
+  employees = preloaded || await fetchEmployees();
   const todaySnap = await Promise.all(employees.map(e => getDoc(doc(db,'attendance',`${e.id}_${today}`))));
   const list = $('emp-list');
   list.innerHTML = '';
@@ -1499,7 +1503,38 @@ async function loadSelectScreen() {
 
 async function fetchEmployees() {
   const snap = await getDocs(collection(db,'employees'));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const emps = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  // Cache display fields only (never PINs/salaries) for instant render next open
+  try {
+    localStorage.setItem(LS_EMP_CACHE, JSON.stringify(
+      emps.map(e => ({ id: e.id, name: e.name, designation: e.designation }))
+    ));
+  } catch(_) {}
+  return emps;
+}
+
+// Instant name-picker from the last visit's cache while Firestore loads.
+// Cards are display-only until real data replaces them (~1s later).
+function renderCachedSelectScreen() {
+  let cached;
+  try { cached = JSON.parse(localStorage.getItem(LS_EMP_CACHE)); } catch(_) {}
+  if (!cached || !cached.length) return false;
+  const list = $('emp-list');
+  list.innerHTML = '';
+  cached.forEach(emp => {
+    const card = document.createElement('div');
+    card.className = 'emp-card';
+    card.innerHTML = `
+      <div class="emp-avatar">${initials(emp.name)}</div>
+      <div class="emp-info">
+        <div class="emp-name">${emp.name}</div>
+        <div class="emp-role" style="color:var(--muted);font-size:12px;">${emp.designation||'Employee'}</div>
+      </div>
+    `;
+    card.onclick = () => showToast('Loading…');
+    list.appendChild(card);
+  });
+  return true;
 }
 
 // ── PIN ──
@@ -3195,28 +3230,32 @@ const VAPID_KEY = window.location.hostname === PRODUCTION_HOSTNAME
 async function boot() {
   showScreen('screen-select');
   $('select-date-str').textContent = fmtDate(todayStr());
-  $('emp-list').innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:32px 0;">Connecting...</div>';
+  // Instant render from last visit's cache; fall back to "Connecting..." on first ever open
+  if (!renderCachedSelectScreen()) {
+    $('emp-list').innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:32px 0;">Connecting...</div>';
+  }
 
   try {
     localStorage.setItem(LS_CONFIG, JSON.stringify(EMBEDDED_CONFIG));
     await initFirebase(EMBEDDED_CONFIG);
 
-    // Load store geofence settings (falls back to defaults if missing)
-    await loadStoreSettings();
-    // Load holiday list for calendar/salary math
-    await loadHolidays();
-    // Load admin config (hashed PIN); null if not yet migrated
-    await loadAdminConfig();
-
     const deviceId = getOrCreateDeviceId();
 
-    // Check Firestore for a device lock
-    const deviceDoc = await getDoc(doc(db, 'devices', deviceId));
+    // All boot reads are independent — run them in parallel instead of one-by-one
+    // (store geofence settings, holidays, admin config, device lock, employees)
+    const [,,, deviceDoc, emps] = await Promise.all([
+      loadStoreSettings(),
+      loadHolidays(),
+      loadAdminConfig(),
+      getDoc(doc(db, 'devices', deviceId)),
+      fetchEmployees(),
+    ]);
+    employees = emps;
+
     if (deviceDoc.exists()) {
       const deviceData = deviceDoc.data();
       if (deviceData.empId && !deviceData.unlocked) {
-        // Device is locked — load employee and go straight to PIN screen
-        employees = await fetchEmployees();
+        // Device is locked — go straight to PIN screen
         const emp = employees.find(e => e.id === deviceData.empId);
         if (emp) {
           // Store device name for after login
@@ -3228,8 +3267,8 @@ async function boot() {
       }
     }
 
-    // No device lock — show select screen normally
-    await loadSelectScreen();
+    // No device lock — show select screen normally (employees already fetched above)
+    await loadSelectScreen(employees);
   } catch(e) {
     console.error('Firebase init failed', e);
     $('emp-list').innerHTML = '<div style="color:var(--danger);font-size:13px;text-align:center;padding:32px 0;">Could not connect. Check your internet and refresh.</div>';
