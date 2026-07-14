@@ -3274,7 +3274,10 @@ async function boot() {
     await loadSelectScreen(employees);
   } catch(e) {
     console.error('Firebase init failed', e);
-    $('emp-list').innerHTML = '<div style="color:var(--danger);font-size:13px;text-align:center;padding:32px 0;">Could not connect. Check your internet and refresh.</div>';
+    // Show the underlying reason so failures are diagnosable from the screen
+    const detail = String((e && (e.code || e.message)) || e).slice(0, 120);
+    $('emp-list').innerHTML = '<div style="color:var(--danger);font-size:13px;text-align:center;padding:32px 0;">Could not connect. Check your internet and refresh.'
+      + '<br/><span style="color:var(--muted);font-size:11px;">Details: ' + detail.replace(/</g, '&lt;') + '</span></div>';
   }
 }
 boot();
