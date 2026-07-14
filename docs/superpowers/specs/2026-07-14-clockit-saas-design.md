@@ -18,6 +18,8 @@ One person (starting with Kartik) can own multiple businesses; each business has
 - **Anti-spoofing signals flag, never auto-block.** Consistent with the existing 80m anomaly-queue philosophy: every suspicious check-in lands in the admin anomaly queue with a reason; a human decides.
 - **Billing starts manual** (UPI/bank transfer, owner flips a status flag). Razorpay (~2%/txn) only when customer volume justifies it.
 - **Auto-clockout stays removed** (explicit prior decision — do not re-add).
+- **Open-source alternatives evaluated and rejected (2026-07-14).** Frappe HR, Horilla, Odoo Community, OrangeHRM, IceHrm, TimeTrex were assessed. All are heavy server stacks (self-managed VPS or ~₹850+/mo managed hosting), none detect mock locations, and the required customizations (PIN UX, anomaly queue, spoof detection) would mean maintaining a fork of a large foreign codebase. Decision: build from scratch on the existing ClockIt base. One idea adopted from the survey: selfie-at-punch (below).
+- **Selfie at clock-in — optional, per-business toggle (owner decides).** Camera snap at check-in, uploaded through the Worker to Cloudflare R2 (never Firestore — it's not for images), auto-deleted after 90 days for privacy and space. Catches buddy-punching (someone clocking in for a friend), which GPS checks cannot. Works on both app and web. Ships with Phase 3.
 
 ## Architecture
 
@@ -50,9 +52,18 @@ businesses/{bizId}             # name, timezone (IANA), reportTime, status (tria
 - Salary fields readable only by owner/admin and the employee themself.
 - Rules get **automated tests** (Firebase emulator) — tenant isolation is the one property never verified by eyeball alone.
 
-### Backups (Spark has none built in)
+### Data durability ("rock solid" plan)
 
-Worker cron exports every business's data nightly as JSON to Cloudflare R2 (free ≤10 GB). A restore is rehearsed once, not just assumed.
+The realistic threat is not Google losing data (Firestore is replicated across zones even on the free plan) — it's **our own bugs or bad scripts** deleting or corrupting it. Defense in layers:
+
+1. **Nightly automated backups** — Worker cron exports every business's data as JSON to Cloudflare R2 (free ≤10 GB), retained 12 months. Spark has no built-in backup; this replaces it.
+2. **Rehearsed restore** — a restore is tested once on staging, not just assumed. A backup that's never been restored is a hope, not a backup.
+3. **Soft deletes everywhere** — nothing is hard-deleted by user action; 30-day recovery window.
+4. **Rules tests** — automated tenant-isolation tests mean a bug in one business's client can never touch another business's data.
+5. **Staging-first workflow** — no change reaches production data without running against staging Firestore first (existing discipline).
+6. **Availability** — static frontend on Cloudflare + Google-run database beats any self-managed server's uptime; there is no server of ours to crash at 9 AM clock-in time.
+
+Selfie images (when enabled) live in R2, not Firestore, and are excluded from JSON backups (they expire after 90 days by design).
 
 ## Phases (each = its own spec → plan → build cycle)
 
@@ -69,6 +80,7 @@ Worker cron exports every business's data nightly as JSON to Cloudflare R2 (free
 | iOS app | App Attest (genuine app), basic jailbreak checks | Decent — iOS has no mock-location flag; spoofing requires jailbreak/tethered tools, which is itself the barrier |
 | Web | None device-level; check-ins carry a visible "web check-in" lower-trust tag | Fallback only |
 | All | Server-issued timestamps (device clock irrelevant); impossible-travel speed check; GPS-accuracy gate; existing 80m anomaly queue | Baseline |
+| All (optional) | Selfie at clock-in — per-business toggle, owner-controlled; stored in R2, 90-day auto-delete | Catches buddy-punching, which GPS cannot |
 
 Failures of Play Integrity (sideloaded APK, no-Google-Play phones) degrade to web-trust level — flagged, never blocked.
 
