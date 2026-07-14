@@ -2431,9 +2431,22 @@ window.addEmployee = async function() {
 };
 
 window.deleteEmployee = async function(id) {
-  if (!confirm('Remove this employee? Their attendance records will be kept.')) return;
-  await deleteDoc(doc(db,'employees',id));
-  showToast('Employee removed');
+  if (!confirm('Remove this employee? This also deletes their attendance history, device registrations and geofence alerts. This cannot be undone.')) return;
+  // Gather everything tied to this employee across collections
+  const [attSnap, devSnap, anomSnap] = await Promise.all([
+    getDocs(query(collection(db,'attendance'), where('employeeId','==',id))),
+    getDocs(collection(db,'devices')),
+    getDocs(query(collection(db,'geofenceAnomalies'), where('employeeId','==',id)))
+  ]);
+  const refs = [
+    doc(db,'employees',id),
+    ...attSnap.docs.map(d => d.ref),
+    ...devSnap.docs.filter(d => d.data().empId === id).map(d => d.ref),
+    ...anomSnap.docs.map(d => d.ref)
+  ];
+  // ponytail: parallel single deletes; switch to chunked writeBatch if an employee ever has thousands of records
+  await Promise.all(refs.map(r => deleteDoc(r)));
+  showToast(`Employee removed · ${refs.length - 1} related record${refs.length - 1 === 1 ? '' : 's'} deleted`);
   await loadAdminPanel();
 };
 
