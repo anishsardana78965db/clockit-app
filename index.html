@@ -1605,6 +1605,17 @@ async function checkPin() {
   $('pin-submit-btn').classList.remove('visible');
   $('pin-hint').textContent = 'Loading...';
 
+  // Test mode: skip device lock entirely — no devices doc is written, and
+  // any employee can log in from any browser window.
+  if (TEST_MODE) {
+    $('pin-hint').textContent = '';
+    currentDeviceName = 'Test mode';
+    $('dash-device-name').textContent = currentDeviceName;
+    await loadDashboard(currentEmp);
+    showScreen('screen-dash');
+    return;
+  }
+
   // Check if this device is already registered in Firestore
   const deviceId = getOrCreateDeviceId();
   const deviceDoc = await getDoc(doc(db, 'devices', deviceId));
@@ -3198,6 +3209,12 @@ const STAGING_CONFIG = {
 
 const PRODUCTION_HOSTNAME = "clockit-wot.pages.dev";
 
+// Test mode: on any non-production URL the device lock is skipped, so one
+// browser can switch freely between employees while testing. Add ?lock to
+// the staging URL to re-enable locking when testing the lock feature itself.
+const TEST_MODE = window.location.hostname !== PRODUCTION_HOSTNAME
+  && !new URLSearchParams(window.location.search).has('lock');
+
 const EMBEDDED_CONFIG = window.location.hostname === PRODUCTION_HOSTNAME
   ? PRODUCTION_CONFIG
   : STAGING_CONFIG;
@@ -3238,7 +3255,7 @@ async function boot() {
     ]);
     employees = emps;
 
-    if (deviceDoc.exists()) {
+    if (!TEST_MODE && deviceDoc.exists()) {
       const deviceData = deviceDoc.data();
       if (deviceData.empId && !deviceData.unlocked) {
         // Device is locked — go straight to PIN screen
