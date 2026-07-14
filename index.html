@@ -449,10 +449,6 @@
   }
   .salary-prefix .text-input { padding-left: 28px; }
 
-  .salary-collapsible-head { display:flex; align-items:center; justify-content:space-between; cursor:pointer; gap:12px; }
-  .salary-collapsible-head .salary-head-left { text-align:left; }
-  .salary-collapsible-head .chev { transition: transform 0.2s ease; opacity:0.85; font-size:14px; }
-  .salary-collapsible-head.open .chev { transform: rotate(180deg); }
   .salary-details { margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.18); font-size:12px; line-height:1.5; opacity:0.9; text-align:left; }
 
   .emp-admin-card {
@@ -771,15 +767,12 @@
   <div id="attendance-calendar"></div>
 
   <div id="dash-salary-card" style="display:none;background:linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%);border-radius:12px;padding:14px 16px;margin-top:20px;color:#fff;">
-    <div class="salary-collapsible-head" id="dash-salary-head" role="button" aria-expanded="false" tabindex="0" onclick="toggleSalaryCard()">
-      <div class="salary-head-left">
-        <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;opacity:0.85;">Expected Salary Payable</div>
-      </div>
-      <span class="chev">▾</span>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;opacity:0.85;">Salary Payable So Far</div>
+      <button id="dash-salary-eye" onclick="toggleSalaryVisibility()" aria-label="Show salary" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);color:#fff;border-radius:8px;width:34px;height:28px;cursor:pointer;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0;">👁</button>
     </div>
-    <div class="salary-details" id="dash-salary-details" style="display:none;text-align:center;">
-      <div id="dash-salary-val" style="font-size:28px;font-weight:700;letter-spacing:-0.5px;opacity:1;">₹0</div>
-    </div>
+    <div id="dash-salary-val" style="font-size:28px;font-weight:700;letter-spacing:1px;margin-top:8px;">₹ •••••</div>
+    <div id="dash-salary-sub" style="font-size:12px;margin-top:4px;color:rgba(255,255,255,0.75);"></div>
   </div>
 
   <button class="cta-btn ghost" onclick="openEmpPinModal()" style="margin-top:20px;font-size:13px;">🔑 Change My PIN</button>
@@ -1740,29 +1733,30 @@ async function loadDashboard(emp, month) {
   $('stat-absent').textContent = absentDays;
   $('stat-working').textContent = workingDaysElapsed;
   const monthlySalary = emp.monthlySalary || 0;
-  // Salary card — current month only
+  // Salary card — current month only. Amount starts masked on every render.
   if (monthlySalary > 0 && isCurrentMonth) {
     const paidDays = daysPresent + holidaysElapsed;
-    const salaryPayable = Math.round((monthlySalary * paidDays) / 30);
-    $('dash-salary-val').textContent = '₹' + salaryPayable.toLocaleString('en-IN');
+    dashSalaryAmount = Math.round((monthlySalary * paidDays) / 30);
+    dashSalaryShown = false;
+    renderSalaryValue();
+    $('dash-salary-sub').textContent = `Based on ${paidDays} paid day${paidDays === 1 ? '' : 's'} this month`;
     $('dash-salary-card').style.display = 'block';
-    // Reset to collapsed on each render
-    $('dash-salary-details').style.display = 'none';
-    $('dash-salary-head').classList.remove('open');
-    $('dash-salary-head').setAttribute('aria-expanded', 'false');
   } else {
     $('dash-salary-card').style.display = 'none';
   }
   renderCalendar(monthData, now);
 }
 
-window.toggleSalaryCard = function() {
-  const head = $('dash-salary-head');
-  const details = $('dash-salary-details');
-  if (!head || !details) return;
-  const isOpen = head.classList.toggle('open');
-  details.style.display = isOpen ? 'block' : 'none';
-  head.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+let dashSalaryAmount = 0, dashSalaryShown = false;
+function renderSalaryValue() {
+  $('dash-salary-val').textContent = dashSalaryShown ? '₹' + dashSalaryAmount.toLocaleString('en-IN') : '₹ •••••';
+  const eye = $('dash-salary-eye');
+  eye.textContent = dashSalaryShown ? '🙈' : '👁';
+  eye.setAttribute('aria-label', dashSalaryShown ? 'Hide salary' : 'Show salary');
+}
+window.toggleSalaryVisibility = function() {
+  dashSalaryShown = !dashSalaryShown;
+  renderSalaryValue();
 };
 
 function renderCheckInOut() {
@@ -1802,8 +1796,8 @@ function renderCalendar(monthData, now) {
   renderCalendarInto(cal, monthData, now);
 }
 
-// adminMode = true → show work-hours colour coding; false → plain green/red for employee view
-function renderCalendarInto(cal, monthData, now, adminMode) {
+// Work-hours colour coding (full/partial/short) — shown to both admin and employees.
+function renderCalendarInto(cal, monthData, now) {
   const year = now.getFullYear();
   const month = now.getMonth();
   const today = now.getDate();
@@ -1860,50 +1854,39 @@ function renderCalendarInto(cal, monthData, now, adminMode) {
       const lateStart = ciHour > 10.0; // after 10:00 AM
       const earlyEnd = coHour !== null && coHour < 18.0; // before 6:00 PM
 
-      if (adminMode) {
-        // No checkout yet — show neutral green (still in)
-        if (!rec.checkOut) {
-          bg = 'rgba(22,163,74,0.12)'; color = 'var(--success)'; border = '1px solid rgba(22,163,74,0.3)'; dotColor = 'var(--success)';
-        } else if (durHrs >= 8 && !lateStart && !earlyEnd) {
-          // Full shift ≥8h, in by 10, out after 18 → green
-          bg = 'rgba(22,163,74,0.15)'; color = '#15803d'; border = '1px solid rgba(22,163,74,0.4)'; dotColor = 'var(--success)';
-        } else if (durHrs < 4) {
-          // Very short shift <4h → red
-          bg = 'rgba(220,38,38,0.12)'; color = 'var(--danger)'; border = '1px solid rgba(220,38,38,0.35)'; dotColor = 'var(--danger)';
-        } else {
-          // Partial — late start, early leave, or 4–8h → yellow
-          bg = 'rgba(217,119,6,0.12)'; color = '#b45309'; border = '1px solid rgba(217,119,6,0.35)'; dotColor = '#d97706';
-        }
-        const dur = durMins !== null ? `${Math.floor(durMins/60)}h ${durMins%60}m` : '';
-        title = `In: ${fmtTime(rec.checkIn)}${rec.checkOut ? ' · Out: '+fmtTime(rec.checkOut)+(dur?' ('+dur+')':'') : ' · Still in'}`;
-        if (rec.checkInDistanceM != null) title += ` · 📍${rec.checkInDistanceM}m`;
-        if (adminMode && rec.checkOut) {
-          if (durHrs < 4) title += ' ⚠ Short shift';
-          else if (lateStart) title += ' ⚠ Late start';
-          else if (earlyEnd) title += ' ⚠ Early leave';
-        }
-        if (rec.checkOutOutsideFence) title += ' ⚠ Off-site checkout';
-        if (isHolidayCell) {
-          title += ` · 🎉 ${holidays[dateStr]?.reason || 'Holiday'}`;
-          // Overlay a purple accent on the border for worked holidays
-          border = '1px solid rgba(147,51,234,0.5)';
-        }
-      } else {
-        // Employee view — plain green
+      // No checkout yet — show neutral green (still in)
+      if (!rec.checkOut) {
         bg = 'rgba(22,163,74,0.12)'; color = 'var(--success)'; border = '1px solid rgba(22,163,74,0.3)'; dotColor = 'var(--success)';
-        const dur = (rec.checkIn && rec.checkOut) ? (() => { const m=Math.round((rec.checkOut-rec.checkIn)/60000); return `${Math.floor(m/60)}h ${m%60}m`; })() : '';
-        title = `In: ${fmtTime(rec.checkIn)}${rec.checkOut ? ' · Out: '+fmtTime(rec.checkOut)+(dur?' ('+dur+')':'') : ' · Still in'}`;
-        if (isHolidayCell) {
-          title += ` · 🎉 ${holidays[dateStr]?.reason || 'Holiday'}`;
-          border = '1px solid rgba(147,51,234,0.5)';
-        }
+      } else if (durHrs >= 8 && !lateStart && !earlyEnd) {
+        // Full shift ≥8h, in by 10, out after 18 → green
+        bg = 'rgba(22,163,74,0.15)'; color = '#15803d'; border = '1px solid rgba(22,163,74,0.4)'; dotColor = 'var(--success)';
+      } else if (durHrs < 4) {
+        // Very short shift <4h → red
+        bg = 'rgba(220,38,38,0.12)'; color = 'var(--danger)'; border = '1px solid rgba(220,38,38,0.35)'; dotColor = 'var(--danger)';
+      } else {
+        // Partial — late start, early leave, or 4–8h → yellow
+        bg = 'rgba(217,119,6,0.12)'; color = '#b45309'; border = '1px solid rgba(217,119,6,0.35)'; dotColor = '#d97706';
+      }
+      const dur = durMins !== null ? `${Math.floor(durMins/60)}h ${durMins%60}m` : '';
+      title = `In: ${fmtTime(rec.checkIn)}${rec.checkOut ? ' · Out: '+fmtTime(rec.checkOut)+(dur?' ('+dur+')':'') : ' · Still in'}`;
+      if (rec.checkInDistanceM != null) title += ` · 📍${rec.checkInDistanceM}m`;
+      if (rec.checkOut) {
+        if (durHrs < 4) title += ' ⚠ Short shift';
+        else if (lateStart) title += ' ⚠ Late start';
+        else if (earlyEnd) title += ' ⚠ Early leave';
+      }
+      if (rec.checkOutOutsideFence) title += ' ⚠ Off-site checkout';
+      if (isHolidayCell) {
+        title += ` · 🎉 ${holidays[dateStr]?.reason || 'Holiday'}`;
+        // Overlay a purple accent on the border for worked holidays
+        border = '1px solid rgba(147,51,234,0.5)';
       }
     } else {
       // Today not yet checked in
       bg = 'var(--surface2)'; color = 'var(--muted)'; border = '1px solid var(--border)'; dotColor = null;
     }
 
-    if (isToday) border = `2px solid ${isPresent ? (adminMode ? dotColor||'var(--success)' : 'var(--success)') : 'var(--accent)'}`;
+    if (isToday) border = `2px solid ${isPresent ? (dotColor || 'var(--success)') : 'var(--accent)'}`;
 
     cell.className = 'cal-cell';
     cell.style.cssText = `text-align:center;padding:6px 2px;border-radius:8px;background:${bg};color:${color};border:${border};font-size:12px;font-weight:${isToday?'700':'500'};position:relative;cursor:${isPresent?'default':'default'};`;
@@ -1929,24 +1912,14 @@ function renderCalendarInto(cal, monthData, now, adminMode) {
 
   // Legend
   const legend = document.createElement('div');
-  if (adminMode) {
-    legend.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:12px;justify-content:center;';
-    legend.innerHTML = `
-      <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:rgba(22,163,74,0.2);display:inline-block;"></span> Full shift (≥8h)</span>
-      <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:rgba(217,119,6,0.15);display:inline-block;"></span> Partial / late</span>
-      <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:rgba(220,38,38,0.12);display:inline-block;"></span> Short (&lt;4h) / absent</span>
-      <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:rgba(147,51,234,0.12);display:inline-block;"></span> Holiday (paid)</span>
-      <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:var(--surface2);display:inline-block;"></span> Sunday</span>
-    `;
-  } else {
-    legend.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:12px;justify-content:center;';
-    legend.innerHTML = `
-      <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:rgba(22,163,74,0.2);display:inline-block;"></span> Present</span>
-      <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:rgba(220,38,38,0.1);display:inline-block;"></span> Absent</span>
-      <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:rgba(147,51,234,0.12);display:inline-block;"></span> Holiday</span>
-      <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:var(--surface2);display:inline-block;"></span> Sunday</span>
-    `;
-  }
+  legend.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:12px;justify-content:center;';
+  legend.innerHTML = `
+    <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:rgba(22,163,74,0.2);display:inline-block;"></span> Full shift (≥8h)</span>
+    <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:rgba(217,119,6,0.15);display:inline-block;"></span> Partial / late</span>
+    <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:rgba(220,38,38,0.12);display:inline-block;"></span> Short (&lt;4h) / absent</span>
+    <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:rgba(147,51,234,0.12);display:inline-block;"></span> Holiday (paid)</span>
+    <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:var(--surface2);display:inline-block;"></span> Sunday</span>
+  `;
   cal.appendChild(legend);
 }
 
@@ -2697,7 +2670,7 @@ window.viewEmpAttendance = async function(empId, empName) {
   }
 
   // Calendar
-  renderCalendarInto(container, monthData, now, true);
+  renderCalendarInto(container, monthData, now);
 
   // ── Weekly averages ──
   const checkedInRecords = monthData.filter(r => r.checkIn);
